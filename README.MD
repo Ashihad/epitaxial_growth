@@ -1,4 +1,4 @@
 # Master thesis
 
-`make objects-clangtidy`
-`make main-clangtidy`
+`make objects_clangtidy`
+`make epitaxal_mc_clangtidy`
