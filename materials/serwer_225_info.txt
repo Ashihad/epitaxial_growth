@@ -1,0 +1,44 @@
+
+
+Komputer widoczny jest tylko wewn±trz sieci wydzia³owej,
+konieczne jest po³±czenie/tunelowanie ssh poprzez serwer Taurus
+
+ip:		172.30.0.225
+user: 	ragonet
+pass: 	ragonet123
+
+Po zalogowaniu siê na konto proszê zmieniæ has³o.
+Na komputerze zainstalowyany jest kompilator GNU g++.
+Programy mo¿na uruchamiaæ w tle w systemie kolejkowym 
+(program task-spooler)
+
+Opcje programu:
+
+tsp   		:sprawdzamy aktualny stan kolejki
+
+tsp -S    		:sprawdzamy ile zadañ mo¿e byæ wykonywanych jednocze¶nie
+
+tsp -S liczba  	:ustawialmy maksymaln± liczbê jednocze¶nie wykonywanych zadañ 
+				(maksymalnie 12 - bo tyle rdzeni ma procesor)
+
+==================================================================================
+skrypt do wstawiania zadania (a.out) do kolejki,
+
+#!/bin/bash
+tsp -n -f -L $PWD ./a.out > wyjscie.dat &
+
+
+
+wyj¶cie std (ekran) zapisywane jest do pliku wyjscie.dat w aktualnym katalogu 
+wykonanie skryptu
+
+sh ./nazwa_skryptu
+
+==================================================================================
+
+tsp -k         	:usuwa ostanie dzia³aj±ce zadanie
+
+tsp -r [id]    	:usuwa ostatnie zadanie wstawione do kolejki
+
+
+Reszta opcji programu kolejkowego =>  man tsp

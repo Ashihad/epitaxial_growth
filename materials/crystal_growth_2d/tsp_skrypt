@@ -1,0 +1,2 @@
+#!/bin/bash
+tsp -n -f -L $PWD ./a.out > wyjscie.dat &
