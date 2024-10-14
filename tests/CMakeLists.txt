@@ -2,6 +2,7 @@ include(GoogleTest)
 enable_testing()
 
 add_executable("main_UT" "test_linalg.cpp" "test_physics.cpp" "test_rng.cpp" "test_sim.cpp")
+target_include_directories("main_UT" PUBLIC .)
 target_link_libraries("main_UT" PUBLIC "linalg" "physics" "rng" "sim")
 target_link_libraries("main_UT" PRIVATE GTest::gtest_main)
 if(${ENABLE_WARNINGS})
