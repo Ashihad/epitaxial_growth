@@ -5,6 +5,7 @@
 build/
 build-*/
 html/
+Testing/
 
 ############ C/C++ #############
 # Prerequisites
@@ -48,6 +49,8 @@ html/
 *.su
 *.idb
 *.pdb
+# Data files
+*.dat
 
 ################################
 ########### VS CODE ############
