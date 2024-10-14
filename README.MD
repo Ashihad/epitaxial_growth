@@ -1,4 +1,3 @@
 # Master thesis
 
-`make objects_clangtidy`
-`make epitaxal_mc_clangtidy`
+Install all required Python packages: `pip install -r requirements.txt`
