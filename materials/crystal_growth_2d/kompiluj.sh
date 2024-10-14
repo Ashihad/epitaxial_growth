@@ -8,12 +8,5 @@ g++ -Ofast -fdefault-real-8  -fdefault-double-8  -w \
            -march=native \
            -flto \
            *.cpp \
-            -I${HOME}/bin/bib \
-            -I${MKLROOT}/include_gf \
-             -Wl,--start-group \
-                  ${MKLROOT}/lib/intel64/libmkl_gf_lp64.so \
-                  ${MKLROOT}/lib/intel64/libmkl_gnu_thread.so \
-                  ${MKLROOT}/lib/intel64/libmkl_core.so \
-             -Wl,--end-group \
-             -lgomp -lpthread -lm -ldl         
+            -lpthread -lm -ldl -o new.out        
 
