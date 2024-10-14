@@ -12,6 +12,9 @@ build: prepare
 	make 
 	@cd -
 
+test:
+	cd build/ && make test
+
 clang-tidy:
 	cd build && $(MAKE) objects_clangtidy
 	cd build && $(MAKE) epitaxal_mc_clangtidy
