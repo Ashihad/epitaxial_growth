@@ -382,8 +382,7 @@ inline double scalar_product_x_y(const int & n, double * x, double * y){
 			rj_2=scalar_product_x_y(n,rj,rj);
 			Apj_2=scalar_product_x_y(n,Apj,pj);
 			alfa=rj_2/Apj_2;
-      printf("alfa= %15.5E \n",alfa);
-			if(abs(alfa)<1.0E-5)printf("BLAD CG:  alfa= %15.5E \n",alfa);
+			if(fabs(alfa)<1.0E-5)printf("BLAD CG:  alfa= %15.5E \n",alfa);
 			
 			for(int i=0;i<n;i++)xjp1[i]=xj[i]+alfa*pj[i];
 			for(int i=0;i<n;i++)rjp1[i]=rj[i]-alfa*Apj[i];
