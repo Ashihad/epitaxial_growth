@@ -37,28 +37,28 @@ int gen_discrete_1_K_multiply_sign( const int & K){
 }
 
 
-void test_gen_discrete_sign(){
+// void test_gen_discrete_sign(){
 		
-		int k=8;
-		int n=100000;
-		vector<double> hist(2*k+1,0.);
+// 		int k=8;
+// 		int n=100000;
+// 		vector<double> hist(2*k+1,0.);
 		
 		
-		for(int i=0;i<n;i++){
-			int m=gen_discrete_1_K_multiply_sign(k);
-			m=m+k;
-			hist[m]++;
-		}
+// 		for(int i=0;i<n;i++){
+// 			int m=gen_discrete_1_K_multiply_sign(k);
+// 			m=m+k;
+// 			hist[m]++;
+// 		}
 	
-		FILE *fp;
-		fp=fopen("hist_d_s.dat","w");
+// 		FILE *fp;
+// 		fp=fopen("hist_d_s.dat","w");
 		
-		for(int i=0;i<(2*k+1);i++){
-			fprintf(fp,"%6d   %15.5E\n",i-k,hist[i]);
-		}
+// 		for(int i=0;i<(2*k+1);i++){
+// 			fprintf(fp,"%6d   %15.5E\n",i-k,hist[i]);
+// 		}
 		
 		
-		fclose(fp);
-		return;
-	}
+// 		fclose(fp);
+// 		return;
+// 	}
 	
