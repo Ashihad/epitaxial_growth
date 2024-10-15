@@ -51,6 +51,8 @@ Testing/
 *.pdb
 # Data files
 **/*.dat
+# Python
+.venv/
 
 ################################
 ########### VS CODE ############

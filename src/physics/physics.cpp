@@ -15,24 +15,24 @@
  * tol_local_max - maksymalna akceptowalna wartosc bledu lokalnego
  * 
  *************************************************************************************************************************/		
-void conduct_relaxation(const int & ipos, const int & jpos, const int & irange_min, const int & irange_max, 
-				int * iterations, double * tolerance,
+void conduct_relaxation(const std::size_t & ipos, const std::size_t & jpos, const std::size_t & irange_min, [[maybe_unused]] const std::size_t & irange_max, 
+				std::size_t * iterations, double * tolerance,
 				std::vector<std::vector<std::vector<double>>> & crystal, double tol_local_max, int iloc,
 				double as,double ag, double al, double skl,double skd)
 {
 	
-	int nx=crystal.size();    //liczba komorek w x
-	int ny=crystal[0].size(); //liczba komorek w y
-	int imin;
-	int jmin;
-	int jmax;
-	int i_nodes;
-	int iter0;
+	std::size_t nx=crystal.size();    //liczba komorek w x
+	std::size_t ny=crystal[0].size(); //liczba komorek w y
+	std::size_t imin;
+	std::size_t jmin;
+	std::size_t jmax;
+	std::size_t i_nodes;
+	std::size_t iter0;
 	double tol0;
 	int ierr;
 	double tol_local=0.;
 	double mu;
-	int irange=irange_min;
+	std::size_t irange=irange_min;
 	double bmax=0;
 	
 	
@@ -53,32 +53,17 @@ void conduct_relaxation(const int & ipos, const int & jpos, const int & irange_m
 				 * 
 				 *************************************************************************************/
 				imin=(ipos-irange+nx)%nx;
-				jmin=std::max(jpos-irange,1);
-				jmax=std::min(jpos+irange,ny-2);
+				jmin=std::max(jpos-irange,1ul);
+				jmax=std::min(jpos+irange,ny-2ul);
 				i_nodes=2*irange; //roznica: imin->imax
 				iter0=*iterations;
 				tol0=*tolerance;
 				ierr=0;
 				solve_linear_system_u_v(crystal,imin,i_nodes,jmin,jmax,as,ag,al,skl,skd,&iter0,&tol0,ierr,&bmax);
 				
-				//liczymy blad lokalny dla zasiegu: irange_max
-				/*
-					imin=(ipos-irange_max+nx)%nx;
-					jmin=max(jpos-irange_max,1);
-					jmax=min(jpos+irange_max,ny-2);
-					i_nodes=2*irange_max; 
-					ierr=1; //liczymy: max|R|=max|Au-f| -> wynik zwracany w tol0
-				
-					solve_linear_system_u_v(crystal,imin,i_nodes,jmin,jmax,as,ag,al,skl,skd,&iter0,&tol0,ierr,&bmax);
-					irange+=10; // np.: 10,20,30,40,50 - zwiekszamy rozmiar otoczenia atomu
-				
-				*/
 				//wartosc bledu lokalnego 
 				mu=(ag-as)/as;
 				tol_local=bmax/mu/as/skl;
-								
-				
-			//}while(tol_local>tol_local_max && irange_min <= irange_max);
 		}	
 		
 		
@@ -112,7 +97,7 @@ void conduct_relaxation(const int & ipos, const int & jpos, const int & irange_m
  * 
  **************************************************************************************************************************/
 
-double compute_elastic_energy_wij(const int & i, const int & j, const std::vector<std::vector<std::vector<double>>> & crystal, 
+double compute_elastic_energy_wij(const std::size_t & i, const std::size_t & j, const std::vector<std::vector<std::vector<double>>> & crystal, 
 				   const double & as,const double & ag,const double & al,const double & skl,const double & skd){
 					   
 	
@@ -120,8 +105,8 @@ double compute_elastic_energy_wij(const int & i, const int & j, const std::vecto
 		return 0.0;
 	}
 	
-	int nx=crystal.size();    //liczba komorek w x
-	int ny=crystal[0].size(); //liczba komorek w y
+	std::size_t  nx=crystal.size();    //liczba komorek w x
+	// std::size_t  ny=crystal[0].size(); //liczba komorek w y
 
 	static int ip[3][3];
 	static double d1[3][3];
@@ -130,17 +115,17 @@ double compute_elastic_energy_wij(const int & i, const int & j, const std::vecto
 	static double v[3][3];
 	
 	//----------wypelniamy lokalne macierze pomocnicze------------------------------------------
-	for(int ii=0;ii<3;ii++){
-		for(int jj=0;jj<3;jj++){
-			int i3=(i+ii-1+nx)%(nx);
-			int j3=j+jj-1;
+	for(std::size_t ii=0;ii<3;ii++){
+		for(std::size_t jj=0;jj<3;jj++){
+			std::size_t i3=(i+ii-1+nx)%(nx);
+			std::size_t j3=j+jj-1;
 			if(std::lround(crystal[i3][j3][0])>0)ip[ii][jj]=1; //jest atom					
 			else ip[ii][jj]=0; //brak atomu
 			
 			u[ii][jj]=crystal[i3][j3][1];
 			v[ii][jj]=crystal[i3][j3][2];
 			
-			int id=std::lround(crystal[i][j][0]*crystal[i3][j3][0]); // typ oddzialywania
+			long id=std::lround(crystal[i][j][0]*crystal[i3][j3][0]); // typ oddzialywania
 			if(id==1){ //s-s
 				d1[ii][jj]=0;
 				d2[ii][jj]=0;			
@@ -197,14 +182,14 @@ double compute_elastic_energy_wij(const int & i, const int & j, const std::vecto
  *  crystal[][][7]=dW/dv_ij
  * 
  **************************************************************************************************************************/
-double compute_gradient(int nx, int ny,  std::vector<std::vector<std::vector<double>>> & crystal, 
+double compute_gradient(std::size_t nx, std::size_t ny,  std::vector<std::vector<std::vector<double>>> & crystal, 
 				   const double & as,const double & ag,const double & al,const double & skl,const double & skd)
 {
 	
 	double gradient_norm=0;
 	
-	for(int i=0;i<nx;i++){
-		for(int j=1;j<(ny-1);j++){
+	for(std::size_t i=0;i<nx;i++){
+		for(std::size_t j=1;j<(ny-1);j++){
 			
 			if(crystal[i][j][0]>0.5){
 			

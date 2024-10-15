@@ -1,5 +1,7 @@
+#include <cstddef>
+
 double gen_uniform();
-int gen_discrete_1_K(const int & K);
+std::size_t gen_discrete_1_K(const std::size_t & K);
 int gen_sign();
-int gen_discrete_1_K_multiply_sign(const int & K);
+std::size_t gen_discrete_1_K_multiply_sign(const std::size_t & K);
 void test_gen_discrete_sign();

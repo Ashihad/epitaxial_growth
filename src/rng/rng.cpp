@@ -17,13 +17,12 @@ using namespace std;
  ***************************************************************************/
 
 double gen_uniform(){
-	return ((double)rand()/RAND_MAX);
+	return (static_cast<double>(rand())/RAND_MAX);
 }
 
 
-int gen_discrete_1_K(const int & K){
-	int k1=lround(floor(gen_uniform()*K)+1);	
-	return k1;
+std::size_t gen_discrete_1_K(const std::size_t & K){
+	return static_cast<std::size_t>(lround(floor(gen_uniform()*static_cast<double>(K))+1));
 }
 
 
@@ -32,8 +31,8 @@ int gen_sign(){
 	else return 1;
 }
 
-int gen_discrete_1_K_multiply_sign( const int & K){
-	return gen_discrete_1_K(K)*gen_sign();
+std::size_t gen_discrete_1_K_multiply_sign( const std::size_t & K){
+	return static_cast<std::size_t>(static_cast<int>(gen_discrete_1_K(K))*gen_sign());
 }
 
 
