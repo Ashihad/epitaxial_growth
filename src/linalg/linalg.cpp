@@ -30,30 +30,31 @@
  * ierr=0,1:  0-rozwiazujemy uklad rownan, 1-liczymy norme max aktualnego rozwiazania
  * 
  ************************************************************************************************/
-void solve_linear_system_u_v(std::vector<std::vector<std::vector<double>>> & crystal,int imin, int i_nodes,int jmin,int jmax, 
-				     double as, double ag, double al, double skl, double skd,int *iterations, double *tolerance, 
+void solve_linear_system_u_v(std::vector<std::vector<std::vector<double>>> & crystal,std::size_t imin, std::size_t i_nodes,std::size_t jmin,std::size_t jmax, 
+				     double as, double ag, double al, double skl, double skd,std::size_t *iterations, double *tolerance, 
 				     int ierr, double *bmax)
 {
 
 	auto s1 = std::chrono::high_resolution_clock::now();
 	
-	int nx=crystal.size();    //liczba komorek w x
-	int ny=crystal[0].size(); //liczba komorek w y
+	std::size_t nx=crystal.size();    //liczba komorek w x
+	std::size_t ny=crystal[0].size(); //liczba komorek w y
 	
 	//sprawdzamy dolny i gorny zakres aby nie wyjsc za tablice
 	if(jmin<1 || jmax>ny-2){
-		jmin=std::max(jmin,1);
-		jmax=std::min(jmax,ny-2);
+		jmin=std::max(jmin,1ul);
+		jmax=std::min(jmax,ny-2ul);
 	}
 	
-	int imax=imin+abs(i_nodes); //imax moze byc wieksze od (nx-1) - indeks jest renormalizowany
+  // wczesniej: int imax=imin+abs(inodes);
+	std::size_t imax=imin+i_nodes; //imax moze byc wieksze od (nx-1) - indeks jest renormalizowany
 
 	/*
 	 * usuwamy stare indeksy globalne, wpisujemy blokade (wb Dirichleta): -1
 	 * jesli pozniej zmienimy numer (0,1,2,3,...) to bedzie warunek Neumanna
 	 */
-	for(int i=0;i<nx;i++){
-		for(int j=0;j<ny;j++){
+	for(std::size_t i=0;i<nx;i++){
+		for(std::size_t j=0;j<ny;j++){
 		      crystal[i][j][3]=-1;
 			crystal[i][j][4]=-1;
 		}
@@ -65,25 +66,24 @@ void solve_linear_system_u_v(std::vector<std::vector<std::vector<double>>> & cry
 	 * 
 	 */
 	
-	int nrow_max=(abs(i_nodes)+1)*(jmax-jmin+1)*2; //maksymalna liczba wierszy (dwa kierunki (x,y))
-	int nrow=0; //faktyczna liczba wierszy - do ustalenia
+	std::size_t nrow_max=(i_nodes+1)*(jmax-jmin+1)*2; //maksymalna liczba wierszy (dwa kierunki (x,y))
+	std::size_t nrow=0; //faktyczna liczba wierszy - do ustalenia
 	std::vector<std::vector<int>> indx; //tablica indeksow
 	indx.resize(nrow_max,std::vector<int>(3,-1));
 	
-	nrow=0;
-	for(int ii=imin;ii<=imax;ii++){
-		for(int j=jmin;j<=jmax;j++){
-			int i=(ii+nx)%(nx); //fizyczny numer komorki	 
+	for(std::size_t ii=imin;ii<=imax;ii++){
+		for(std::size_t j=jmin;j<=jmax;j++){
+			std::size_t i=(ii+nx)%(nx); //fizyczny numer komorki	 
 			if(crystal[i][j][0]>0.5){ //tylko komorki zajete przez atomy
-				crystal[i][j][3]=nrow; //blokada zniesiona
-				indx[nrow][0]=i;
-				indx[nrow][1]=j;
+				crystal[i][j][3]=static_cast<int>(nrow); //blokada zniesiona
+				indx[nrow][0]=static_cast<int>(i);
+				indx[nrow][1]=static_cast<int>(j);
 				indx[nrow][2]=3; //indeks przesuniecie w 'x'
 				nrow++;
 				
-				crystal[i][j][4]=nrow; //blokada zniesiona
-				indx[nrow][0]=i;
-				indx[nrow][1]=j;
+				crystal[i][j][4]=static_cast<int>(nrow); //blokada zniesiona
+				indx[nrow][0]=static_cast<int>(i);
+				indx[nrow][1]=static_cast<int>(j);
 				indx[nrow][2]=4; //indeks przesuniecie w 'y'
 				nrow++;
 			}
@@ -96,7 +96,7 @@ void solve_linear_system_u_v(std::vector<std::vector<std::vector<double>>> & cry
 	 * tablica dla wartosci w pojedynczym wierszu - po wypelnieniu sortujemy
 	 *******************************************************************************************************/
 	
-	int ncol=9*2; //maksymalna liczba elementow w wierszu - liczba sasiadow * liczba kierunkow
+	std::size_t ncol=9*2; //maksymalna liczba elementow w wierszu - liczba sasiadow * liczba kierunkow
 	std::vector<double> acol;
 	std::vector<int> jcol;
 	
@@ -108,20 +108,14 @@ void solve_linear_system_u_v(std::vector<std::vector<std::vector<double>>> & cry
 	 * 
 	 */
 	
-	int nmax=nrow*9*2; // maksymalna liczba niezerowych elementow w wierszu * liczba wierszy
-	double * acsr;
-	int * icsr;
-	int * jcsr;
-	double * ff;
-	double * xx;
-	double * bb;
-	acsr=(double *)malloc(nmax*sizeof(double));
-	jcsr=(int *)malloc(nmax*sizeof(int));
-	icsr=(int *)malloc((nrow+1)*sizeof(int));
-	ff=(double *)malloc(nrow*sizeof(double));
-	xx=(double *)malloc(nrow*sizeof(double));
-	bb=(double *)malloc(nrow*sizeof(double));
-	icsr[nrow]=0; //aktualna liczba NNZ	w macierzy ukladu 
+	std::size_t nmax=nrow*9*2; // maksymalna liczba niezerowych elementow w wierszu * liczba wierszy
+	double* acsr = static_cast<double *>(malloc(nmax*sizeof(double)));
+	int* icsr = static_cast<int *>(malloc((nrow+1)*sizeof(int)));
+  icsr[nrow] = 0; //aktualna liczba NNZ	w macierzy ukladu 
+	int* jcsr = static_cast<int *>(malloc(nmax*sizeof(int)));
+	double* ff = static_cast<double *>(malloc(nrow*sizeof(double)));
+	double* xx = static_cast<double *>(malloc(nrow*sizeof(double)));
+	double* bb = static_cast<double *>(malloc(nrow*sizeof(double)));
 		
 	//tworzymy tablice lokalnego otoczenia punktu 3x3
 	/*
@@ -150,14 +144,17 @@ void solve_linear_system_u_v(std::vector<std::vector<std::vector<double>>> & cry
 	/*================================================================================================
 	 * generujemy elementy macierzowe i wektor wyrazow wolnych 
 	 *================================================================================================*/
-	for(int k=0;k<nrow;k++){ //numer wiersza globalnego
+	for(std::size_t k=0;k<nrow;k++){ //numer wiersza globalnego
 		
-			int i=indx[k][0]; //atom centralny dla wiersza
-			int j=indx[k][1];
+      // experimental, wcześniej:
+			// int i=indx[k][0]; //atom centralny dla wiersza
+			// int j=indx[k][1];
+      std::size_t i = static_cast<std::size_t>(indx[k][0]); //atom centralny dla wiersza
+      std::size_t j = static_cast<std::size_t>(indx[k][1]);
 
 			
-			for(int ii=0;ii<3;ii++){
-				for(int jj=0;jj<3;jj++){
+			for(std::size_t ii=0;ii<3;ii++){
+				for(std::size_t jj=0;jj<3;jj++){
 					ip[ii][jj]=0;
 					d1[ii][jj]=0;
 					d2[ii][jj]=0;
@@ -167,12 +164,14 @@ void solve_linear_system_u_v(std::vector<std::vector<std::vector<double>>> & cry
 			
 			
 			//----------wypelniamy lokalne macierze pomocnicze------------------------------------------
-			for(int ii=0;ii<3;ii++){
-				for(int jj=0;jj<3;jj++){
-					int i3=(i+ii-1+nx)%(nx);
-					int j3=j+jj-1;
-					if(lround(crystal[i3][j3][0])>0)ip[ii][jj]=1; //jest atom					
-					else ip[ii][jj]=0; //brak atomu
+			for(std::size_t ii=0;ii<3;ii++){
+				for(std::size_t jj=0;jj<3;jj++){
+					std::size_t i3=(i+ii-1+nx)%(nx);
+					std::size_t j3=j+jj-1;
+					if(lround(crystal[i3][j3][0])>0)
+            ip[ii][jj]=1; //jest atom					
+					else 
+            ip[ii][jj]=0; //brak atomu
 								
 					if(crystal[i3][j3][3]<0){ 
 						iboundary[ii][jj]=0; // brzeg: Dirichlet (wyraz przenosimy do wyrazow wolnych)
@@ -180,7 +179,7 @@ void solve_linear_system_u_v(std::vector<std::vector<std::vector<double>>> & cry
 						iboundary[ii][jj]=1; // brzeg: Neumann (wyrazy zostawiamy w macierzy A)
 					}
 					
-					int id=lround(crystal[i][j][0]*crystal[i3][j3][0]); // typ oddzialywania
+					long id=lround(crystal[i][j][0]*crystal[i3][j3][0]); // typ oddzialywania
 					if(id==1){ //s-s
 						d1[ii][jj]=0;
 						d2[ii][jj]=0;
@@ -201,8 +200,7 @@ void solve_linear_system_u_v(std::vector<std::vector<std::vector<double>>> & cry
 		*================================================================================*/
 			jcol[0]=0; // 0-brak elementow: liczbe elementow trzymamy w elemencie  jcol[0]
 			
-			int number;
-			number=indx[k][2];  //number:  3-uij, 4-vij
+			std::size_t number = static_cast<std::size_t>(indx[k][2]);  //number:  3-uij, 4-vij
 			
 			ff[k]=0.; //zerujemy element wektora wyrazow wolnych - usuwamy smieci z poprzednich iteracji
 			fill(acol.begin(), acol.end(), 0.0);
@@ -223,16 +221,16 @@ void solve_linear_system_u_v(std::vector<std::vector<std::vector<double>>> & cry
 	 *         Conjugate Gradients
 	 * 
 	 ******************************************************/
-		int itmax0=*iterations;
-		double tol0=*tolerance;
+		std::size_t itmax0=*iterations;
 		
-		for(int i=0;i<nrow;i++)xx[i]=0.0; 
+		for(std::size_t i=0;i<nrow;i++)
+      xx[i]=0.0; 
 		
 		// wektor startowy to poprzednie rozwiazanie
-		for(int k=0;k<nrow;k++){ //numer wiersza globalnego
-			int i=indx[k][0];
-			int j=indx[k][1];
-			int number=indx[k][2]; //3-uij, 4-vij
+		for(std::size_t k=0;k<nrow;k++){ //numer wiersza globalnego
+			std::size_t i=static_cast<std::size_t>(indx[k][0]);
+			std::size_t j=static_cast<std::size_t>(indx[k][1]);
+			std::size_t number=static_cast<std::size_t>(indx[k][2]); //3-uij, 4-vij
 			xx[k]=crystal[i][j][number-2]; //number-2: 1-uij, 2-vij
 		}
 		
@@ -251,14 +249,14 @@ void solve_linear_system_u_v(std::vector<std::vector<std::vector<double>>> & cry
 			solve_linear_system_CG_standard(nrow,acsr,icsr,jcsr,ff,xx,iterations,tolerance);	
 			
 			if(*tolerance>=1.0E-3 || *iterations>=itmax0){
-				printf("solution:  iterations,  tolerance  =   %6d   %15.5E  \n\n",*iterations,*tolerance);
+				printf("solution:  iterations,  tolerance  =   %6ld   %15.5E  \n\n",*iterations,*tolerance);
 			}
 		
 			//zachowujemy nowe polozenia/przesuniecia atomow
-			for(int k=0;k<nrow;k++){ //numer wiersza globalnego
-				int i=indx[k][0];
-				int j=indx[k][1];
-				int number=indx[k][2]; //3-uij, 4-vij
+			for(std::size_t k=0;k<nrow;k++){ //numer wiersza globalnego
+				std::size_t i=static_cast<std::size_t>(indx[k][0]);
+				std::size_t j=static_cast<std::size_t>(indx[k][1]);
+				std::size_t number=static_cast<std::size_t>(indx[k][2]); //3-uij, 4-vij
 				crystal[i][j][number-2]=xx[k]; //number-2: 1-uij, 2-vij
 			}
 		}	
@@ -267,9 +265,9 @@ void solve_linear_system_u_v(std::vector<std::vector<std::vector<double>>> & cry
 		//norma max z wektora reszt - liczymy zawsze: ierr-dowolne
 			compute_sparse_Ax_y(nrow,acsr,icsr,jcsr,xx,bb);  // bb = Acsr*xx	
 			*bmax=0.;
-			for(int i=0;i<nrow;i++){
+			for(std::size_t i=0;i<nrow;i++){
 				bb[i]=bb[i]-ff[i];
-				if(abs(bb[i])>*bmax)*bmax=abs(bb[i]);
+				if(std::fabs(bb[i])>*bmax)*bmax=std::fabs(bb[i]);
 			}
 	
 	auto s3 = std::chrono::high_resolution_clock::now();
@@ -292,9 +290,9 @@ void solve_linear_system_u_v(std::vector<std::vector<std::vector<double>>> & cry
 * 	macierz rzadka
 * 
 ***************************************************************************************************************/
-inline void compute_sparse_Ax_y(const int & n, double * acsr, int * icsr, int  * jcsr, double * x, double * y){
+inline void compute_sparse_Ax_y(const std::size_t & n, double * acsr, int * icsr, int  * jcsr, double * x, double * y){
 		
-		for(int i=0;i<n;i++){
+		for(std::size_t i=0;i<n;i++){
 			double sum=0.;
 			int col;
 			for(int j=icsr[i];j<=icsr[i+1]-1;j++){
@@ -310,9 +308,9 @@ inline void compute_sparse_Ax_y(const int & n, double * acsr, int * icsr, int  *
 *	iloczyn skalarny dwoch wektorow
 * 
 ***************************************************************************************************************/
-inline double scalar_product_x_y(const int & n, double * x, double * y){
+inline double scalar_product_x_y(const std::size_t & n, double * x, double * y){
 		double res=0.;
-		for(int i=0;i<n;i++)res+=x[i]*y[i];
+		for(std::size_t i=0;i<n;i++)res+=x[i]*y[i];
 		return res;
 	}	
 
@@ -322,44 +320,35 @@ inline double scalar_product_x_y(const int & n, double * x, double * y){
 * 
 **************************************************************************************************************** 
 ***************************************************************************************************************/
-	void solve_linear_system_CG_standard(const int & n, double * acsr, int * icsr, int  * jcsr, 
-									  double * b, double * x, int * itmax, double *tol)
+	void solve_linear_system_CG_standard(const std::size_t & n, double * acsr, int * icsr, int  * jcsr, 
+									  double * b, double * x, std::size_t * itmax, double *tol)
 	{
 		
 		
 		// sprawdzamy wektor wyrazow wolnych: jesli jest pusty to zwracamy rozwiazanie trywialne vec{x}=0
 		double b_2=scalar_product_x_y(n,b,b);
 		if( b_2 < 1.0E-10 ){
-			for(int i=0;i<n;i++) x[i]=0.;
+			for(std::size_t i=0;i<n;i++) 
+      x[i]=0.;
 			*itmax=0;
 			*tol=0.;
 			return;
 		}
 		
 		//algorytm CG
-		
-		double * rj;
-		double * rjp1;
-		double * xj;
-		double * xjp1;
-		double * tmp1;
-		double * Apj;
-		double * pj;
-		double * pjp1;
-		
-		rj=  (double *)malloc(n*sizeof(double));
-		rjp1=(double *)malloc(n*sizeof(double));
-		xj=  (double *)malloc(n*sizeof(double));
-		xjp1=(double *)malloc(n*sizeof(double));
-		tmp1=(double *)malloc(n*sizeof(double));
-		Apj= (double *)malloc(n*sizeof(double));
-		pj= (double *)malloc(n*sizeof(double));
-		pjp1= (double *)malloc(n*sizeof(double));
+		double* rj=  static_cast<double *>(malloc(n*sizeof(double)));
+		double* rjp1=static_cast<double *>(malloc(n*sizeof(double)));
+		double* xj=  static_cast<double *>(malloc(n*sizeof(double)));
+		double* xjp1=static_cast<double *>(malloc(n*sizeof(double)));
+		double* tmp1=static_cast<double *>(malloc(n*sizeof(double)));
+		double* Apj= static_cast<double *>(malloc(n*sizeof(double)));
+		double* pj= static_cast<double *>(malloc(n*sizeof(double)));
+		double* pjp1= static_cast<double *>(malloc(n*sizeof(double)));
 		
 		
 		compute_sparse_Ax_y(n,acsr,icsr,jcsr,x,tmp1); //A*x0
 		
-		for(int i=0;i<n;i++){
+		for(std::size_t i=0;i<n;i++){
 			xj[i]=x[i]; //proponowane rozwiazanie 
 			rj[i]=b[i]-tmp1[i]; //b-A*x0
 			pj[i]=rj[i];
@@ -368,35 +357,31 @@ inline double scalar_product_x_y(const int & n, double * x, double * y){
 		double Apj_2;
 		double rj_2;
 		double rjp1_2;
-		double xj_2;
 		double err;
 		double alfa;
-		double beta;
-		int ile;
-			
-
 		
-		for(int j=0;j<*itmax;j++){
-			ile=j;	
+		for(std::size_t j=0;j<*itmax;j++){
 			compute_sparse_Ax_y(n,acsr,icsr,jcsr,pj,Apj); //A*pj
 			rj_2=scalar_product_x_y(n,rj,rj);
 			Apj_2=scalar_product_x_y(n,Apj,pj);
 			alfa=rj_2/Apj_2;
 			if(fabs(alfa)<1.0E-5)printf("BLAD CG:  alfa= %15.5E \n",alfa);
 			
-			for(int i=0;i<n;i++)xjp1[i]=xj[i]+alfa*pj[i];
-			for(int i=0;i<n;i++)rjp1[i]=rj[i]-alfa*Apj[i];
+			for(std::size_t i=0;i<n;i++)
+        xjp1[i]=xj[i]+alfa*pj[i];
+			for(std::size_t i=0;i<n;i++)
+        rjp1[i]=rj[i]-alfa*Apj[i];
 			rjp1_2=scalar_product_x_y(n,rjp1,rjp1);
-			beta=rjp1_2/rj_2;
-			for(int i=0;i<n;i++)pjp1[i]=rjp1[i]+beta*pj[i];
+			double beta=rjp1_2/rj_2;
+			for(std::size_t i=0;i<n;i++)
+        pjp1[i]=rjp1[i]+beta*pj[i];
 			
-			for(int i=0;i<n;i++){
+			for(std::size_t i=0;i<n;i++){
 				xj[i]=xjp1[i];
 				rj[i]=rjp1[i];
 				pj[i]=pjp1[i];
 			}
 			
-			xj_2=scalar_product_x_y(n,xj,xj);
 			err=sqrt(rj_2)/sqrt(b_2);
 			
 			if(err< *tol && j>0){
@@ -408,7 +393,8 @@ inline double scalar_product_x_y(const int & n, double * x, double * y){
 		
 		
 		//zapisujemy rozwiazanie
-		for(int i=0;i<n;i++)x[i]=xj[i];
+		for(std::size_t i=0;i<n;i++)
+      x[i]=xj[i];
 		
 		
 		//zwalniamy pamiec
@@ -435,7 +421,7 @@ inline double scalar_product_x_y(const int & n, double * x, double * y){
  * 
  *************************************************************************************************************** 
  ***************************************************************************************************************/
-inline void compute_u_v_from_wxx(const int & number, const int & k,const int & i, const int & j, const int & nx, 
+inline void compute_u_v_from_wxx(const std::size_t & number, const std::size_t & k,const std::size_t & i, const std::size_t & j, const std::size_t & nx, 
 				  const double & skl, const double & skd, 
 				  const std::vector<std::vector<int>> & ip,
 				  const std::vector<std::vector<int>> & iboundary,
@@ -445,9 +431,10 @@ inline void compute_u_v_from_wxx(const int & number, const int & k,const int & i
 				  std::vector<int> & jcol,
 				  double * ff){
 	
-	int ii=1;
-	int jj=1;
-	int i3,lu;
+	std::size_t ii=1;
+	std::size_t jj=1;
+  std::size_t lu;
+	std::size_t i3;
 	double val;
 	
 //element diagonalny 
@@ -465,9 +452,9 @@ inline void compute_u_v_from_wxx(const int & number, const int & k,const int & i
 			-skd/2.*ip[ii][jj]*ip[ii-1][jj+1];	
 		val=val*(-1);//pochodna wewnetrzna	
 		
-		lu=jcol[0]+1;	
-		jcol[0]=lu;
-		jcol[lu]=lround(crystal[i][j][number]);
+		lu=static_cast<std::size_t>(jcol[0]+1);	
+		jcol[0]=static_cast<int>(lu);
+		jcol[lu]=static_cast<int>(lround(crystal[i][j][number]));
 		acol[lu]=val;
 				
 		// element wolny - wxx
@@ -490,9 +477,9 @@ inline void compute_u_v_from_wxx(const int & number, const int & k,const int & i
 			-skd/2.*ip[ii][jj]*ip[ii+1][jj-1]
 			-skd/2.*ip[ii][jj]*ip[ii-1][jj+1];	
 		val=val*(-1);//pochodna wewnetrzna				
-		lu=jcol[0]+1;	
-		jcol[0]=lu;
-		jcol[lu]=lround(crystal[i][j][number]);
+		lu=static_cast<std::size_t>(jcol[0]+1);	
+		jcol[0]=static_cast<int>(lu);
+		jcol[lu]=static_cast<int>(lround(crystal[i][j][number]));
 		acol[lu]=val;
 		
 		// element wolny - wyy
@@ -511,35 +498,39 @@ inline void compute_u_v_from_wxx(const int & number, const int & k,const int & i
 	if(number==3){
 		
 		for(int im=-1;im<=1;im+=2){
-			int jm=0;
-			i3=(i+im+nx)%(nx);
-			val=skl*ip[ii][jj]*ip[ii+im][jj+jm];
+			std::size_t jm=0;
+      std::size_t i_offset = static_cast<std::size_t>(static_cast<int>(ii)+im);
+      std::size_t j_offset = jj+jm;
+			i3=static_cast<std::size_t>((static_cast<int>(i) + im + static_cast<int>(nx)) % static_cast<int>(nx));
+			val=skl*ip[ii][jj]*ip[i_offset][j_offset];
 			val=val*(-1);//pochodna wewnetrzna	
-			if(iboundary[ii+im][jj+jm]==1){
-				lu=jcol[0]+1;	
-				jcol[0]=lu;
-				jcol[lu]=lround(crystal[i3][j+jm][number]);
+			if(iboundary[i_offset][j_offset]==1){
+				lu=static_cast<std::size_t>(jcol[0])+1;	
+				jcol[0]=static_cast<int>(lu);
+				jcol[lu]=static_cast<int>(lround(crystal[i3][j+jm][number]));
 				acol[lu]=val;
 			}
-			else if(iboundary[ii+im][jj+jm]==0)
+			else if(iboundary[i_offset][j_offset]==0)
 				ff[k]-=val*crystal[i3][j+jm][number-2];	
 		}
 		
 	}else if(number==4){
 		
 		for(int jm=-1;jm<=1;jm+=2){
-			int im=0;
-			i3=(i+im+nx)%(nx);
-			val=skl*ip[ii][jj]*ip[ii+im][jj+jm];
+			std::size_t im=0;
+      std::size_t i_offset = ii+im;
+      std::size_t j_offset = static_cast<std::size_t>(static_cast<int>(jj)+jm);
+			i3=(i + im + nx) % nx;
+			val= skl *ip[ii][jj] * ip[i_offset][j_offset];
 			val=val*(-1);//pochodna wewnetrzna	
-			if(iboundary[ii+im][jj+jm]==1){
-				lu=jcol[0]+1;	
-				jcol[0]=lu;
-				jcol[lu]=lround(crystal[i3][j+jm][number]);
+			if(iboundary[i_offset][j_offset]==1){
+				lu=static_cast<std::size_t>(jcol[0]+1);	
+				jcol[0]=static_cast<int>(lu);
+				jcol[lu]=static_cast<int>(lround(crystal[i3][static_cast<std::size_t>(static_cast<int>(j)+jm)][number]));
 				acol[lu]=val;
 			}
-			else if(iboundary[ii+im][jj+jm]==0)
-				ff[k]-=val*crystal[i3][j+jm][number-2];	
+			else if(iboundary[i_offset][j_offset]==0)
+				ff[k]-=val*crystal[i3][static_cast<std::size_t>(static_cast<int>(j)+jm)][number-2];	
 		}
 		
 	}
@@ -547,17 +538,19 @@ inline void compute_u_v_from_wxx(const int & number, const int & k,const int & i
 //next nearest neighbours: pozostale diagonalne i antydiagonalne liczone identycznie	dla uij i vij
 		for(int im=-1;im<=1;im+=2){
 			for(int jm=-1;jm<=1;jm+=2){
-				i3=(i+im+nx)%(nx);
-				val=skd/2.*ip[ii][jj]*ip[ii+im][jj+jm];
+        std::size_t i_offset = static_cast<std::size_t>(static_cast<int>(ii)+im);
+        std::size_t j_offset = static_cast<std::size_t>(static_cast<int>(jj)+jm);
+				i3=static_cast<std::size_t>((static_cast<int>(i) + im + static_cast<int>(nx)) % static_cast<int>(nx));
+				val=skd/2.*ip[ii][jj]*ip[i_offset][j_offset];
 				val=val*(-1);//pochodna wewnetrzna	
-				if(iboundary[ii+im][jj+jm]==1){ //Neumann
-					lu=jcol[0]+1;	
-					jcol[0]=lu;	
-					jcol[lu]=lround(crystal[i3][j+jm][number]);
+				if(iboundary[i_offset][j_offset]==1){ //Neumann
+					lu=static_cast<std::size_t>(jcol[0]+1);	
+					jcol[0]=static_cast<int>(lu);	
+					jcol[lu]=static_cast<int>(lround(crystal[i3][static_cast<std::size_t>(static_cast<int>(j)+jm)][number]));
 					acol[lu]=val;
 				}
-				else if(iboundary[ii+im][jj+jm]==0) //Dirichlet
-					ff[k]-=val*crystal[i3][j+jm][number-2];
+				else if(iboundary[i_offset][j_offset]==0) //Dirichlet
+					ff[k]-=val*crystal[i3][static_cast<std::size_t>(static_cast<int>(j)+jm)][number-2];
 				
 			}
 		}
@@ -577,8 +570,8 @@ inline void compute_u_v_from_wxx(const int & number, const int & k,const int & i
  *  ii=1, jj=1: to punkt centralny
  *************************************************************************************************************** 
  ***************************************************************************************************************/
-inline void compute_u_v_from_wxy(const int & number, const int & k, const int & i, const int & j, 
-				  const int & nx, const double & skd, 
+inline void compute_u_v_from_wxy(const std::size_t & number, const std::size_t & k, const std::size_t & i, const std::size_t & j, 
+				  const std::size_t & nx, const double & skd, 
 				  const std::vector<std::vector<int>> & ip,
 				  const std::vector<std::vector<int>> & iboundary,
 				  const std::vector<std::vector<double>> & d,
@@ -586,13 +579,14 @@ inline void compute_u_v_from_wxy(const int & number, const int & k, const int & 
 				  std::vector<double> & acol,	
 				  std::vector<int> & jcol,
 				  double * ff){
-	int ii=1;
-	int jj=1;
+	std::size_t ii=1;
+	std::size_t jj=1;
 	double wsp=2.0; //mnoznik dla wxy w wij
-	int i3,lu; 
+  std::size_t lu;
+	std::size_t i3; 
 	double val;
 	
-	int number_2;
+	std::size_t number_2;
 	
 	if(number==3){
 		number_2=4; //indeks dla elementu v
@@ -603,16 +597,18 @@ inline void compute_u_v_from_wxy(const int & number, const int & k, const int & 
 	for(int im=-1;im<=1;im+=2){
 		for(int jm=-1;jm<=1;jm+=2){
 			int sign=im*jm*(-1);
-			i3=(i+im+nx)%(nx);
-			double val=sign*skd/4.*ip[ii][jj]*ip[ii+im][jj+jm]*wsp;
-			if(iboundary[ii+im][jj+jm]==1){
-				lu=jcol[0]+1;	
-				jcol[0]=lu;
-				jcol[lu]=lround(crystal[i3][j+jm][ number_2 ]); //oddzialywanie: u->v, v->u
-				acol[lu]=val;
+      std::size_t i_offset = static_cast<std::size_t>(static_cast<int>(ii)+im);
+      std::size_t j_offset = static_cast<std::size_t>(static_cast<int>(jj)+jm);
+			i3=static_cast<std::size_t>((static_cast<int>(i) + im + static_cast<int>(nx)) % static_cast<int>(nx));
+			double val_local=sign*skd/4.*ip[ii][jj]*ip[i_offset][j_offset]*wsp;
+			if(iboundary[i_offset][j_offset]==1){
+				lu=static_cast<std::size_t>(jcol[0]+1);	
+				jcol[0]=static_cast<int>(lu);
+				jcol[lu]=static_cast<int>(lround(crystal[i3][static_cast<std::size_t>(static_cast<int>(j)+jm)][ number_2 ])); //oddzialywanie: u->v, v->u
+				acol[lu]=val_local;
 			}
-			else if(iboundary[ii+im][jj+jm]==0)
-			ff[k]-=val*crystal[i3][j+jm][number_2-2];
+			else if(iboundary[i_offset][j_offset]==0)
+			ff[k]-=val_local*crystal[i3][static_cast<std::size_t>(static_cast<int>(j)+jm)][number_2-2];
 			
 		}
 	}
@@ -624,10 +620,10 @@ inline void compute_u_v_from_wxy(const int & number, const int & k, const int & 
 		-skd/4.*ip[ii][jj]*ip[ii+1][jj-1]
 		-skd/4.*ip[ii][jj]*ip[ii-1][jj+1])*wsp;
 		
-		lu=jcol[0]+1;	
-		jcol[0]=lu;
+		lu=static_cast<std::size_t>(jcol[0]+1);	
+		jcol[0]=static_cast<int>(lu);
 		i3=(i+nx)%(nx);
-		jcol[lu]=lround(crystal[i3][j][number_2]); //v
+		jcol[lu]=static_cast<int>(lround(crystal[i3][j][number_2])); //v
 		acol[lu]=val;
 		
 	//element wolny: f(k)  - wxy
@@ -662,17 +658,17 @@ inline void compute_u_v_from_wxy(const int & number, const int & k, const int & 
  * 
  ***************************************************************************************************************
  ***************************************************************************************************************/
-inline void sort_and_add_matrix_elements(const int & nrow, const int & k, std::vector<int> & jcol, std::vector<double> & acol, 
+inline void sort_and_add_matrix_elements(const std::size_t & nrow, const std::size_t & k, std::vector<int> & jcol, std::vector<double> & acol, 
 					    double * acsr, int * icsr, int * jcsr){
 	
 	
 	//sortowanie
-	int l=jcol[0]; //liczba niezerowych elementow w wierszu
+	std::size_t l=static_cast<std::size_t>(jcol[0]); //liczba niezerowych elementow w wierszu
 	int l1,l2;
 	double a1,a2;
 	
-	for(int i=1;i<l;i++){
-		for(int j=i;j>=1;j--){
+	for(std::size_t i=1;i<l;i++){
+		for(std::size_t j=i;j>=1;j--){
 			l1=jcol[j]; //numery kolumn
 			l2=jcol[j+1];
 			if(l1>l2){  //zamieniamy miejscami 
@@ -692,9 +688,9 @@ inline void sort_and_add_matrix_elements(const int & nrow, const int & k, std::v
 	}
 	
 	//sprawdzamy numery kolumn
-	for(int i=1;i<l;i++){
+	for(std::size_t i=1;i<l;i++){
 		if(jcol[i]>=jcol[i+1]){
-			printf("blad w numerach kolumn:  %d   %d\n ",jcol[i],jcol[i+1]);
+			printf("blad w numerach kolumn:  %d   %d\n ",jcol[static_cast<std::size_t>(i)],jcol[static_cast<std::size_t>(i)+1]);
 			exit(0);
 		}
 	}
@@ -705,7 +701,7 @@ inline void sort_and_add_matrix_elements(const int & nrow, const int & k, std::v
 	int nnz;
 	nnz=icsr[nrow]; //aktualna liczba elementow niezerowych - indeksowane od 0, 
 	icsr[k]=nnz; //pozycja nnz jest pusta - od niej zaczynamy wypelnianie wiersza k-tego
-	for(int i=1;i<=l;i++){
+	for(std::size_t i=1;i<=l;i++){
 		acsr[nnz]=acol[i];
 		jcsr[nnz]=jcol[i];
 		nnz++;

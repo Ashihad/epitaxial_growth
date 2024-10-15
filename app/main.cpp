@@ -37,17 +37,17 @@ int main()
 	double gamma {0.4};      // [eV] - bond energy
 	double E {0.53};         //[eV] - fitting factor for experimental data
 	  
-	int nx {500};
-	int ny {80};
+	std::size_t nx {500};
+	std::size_t ny {80};
 	
 	
-	int nsurf {32}; //wysokosc podloza Si
+	std::size_t nsurf {32}; //wysokosc podloza Si
 	
-	int irange_min {10}; // w zakresie (xi,yj)+/- irange liczne sa lokalne zmiany polozen atomow
-	int irange_max {10}; //maksymalny rozmiar otoczenia w relaksacji lokalnej
+	std::size_t irange_min {10}; // w zakresie (xi,yj)+/- irange liczne sa lokalne zmiany polozen atomow
+	std::size_t irange_max {10}; //maksymalny rozmiar otoczenia w relaksacji lokalnej
 	double tol_local_max {1.0E-2}; //tolerancja bledu w relaksacji lokalnej 
 	
-	int k_max_step {8}; //maksymalny zasieg dyfuzji w jednym kroku
+	std::size_t k_max_step {8}; //maksymalny zasieg dyfuzji w jednym kroku
 	
 	double f_deposition {0.08}; // number of layers/second 
 	double temperature {600.}; //temperatura [K]
@@ -58,7 +58,7 @@ int main()
 	double time_fluence {8.0};
 	double time_simulation {100.0};
 	
-	int iterations {1000}; //maksymalna liczba iteracji w trakcie rozwiazywania ukladu rownan
+	long unsigned iterations {1000}; //maksymalna liczba iteracji w trakcie rozwiazywania ukladu rownan
 	double tolerance {1.0E-3}; //tolerancja bledu w iteracyjnej metodzie rozwiazywania ukaldu rownan
 	
 	int n_write_files {1000};        // zapis danych do pliku co tyle iteracji
