@@ -5,8 +5,6 @@
 #include <cstdlib>
 #include <vector>
 
-using namespace std;
-
 /***************************************************************************
  *   generatory liczb pseudolosowych
  *
