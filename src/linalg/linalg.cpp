@@ -286,16 +286,22 @@ void solve_linear_system_u_v(std::vector<std::vector<std::vector<double>>> & cry
 }//solve Au=F:end
 
 /***************************************************************************************************************
-*	mnozenie macierz-wektor: Ax=y
-* 	macierz rzadka
+*	Compute Ax=y where A is given in CSR format
 * 
+* not comfortable with CSR? https://en.wikipedia.org/wiki/Sparse_matrix#Compressed_sparse_row_(CSR,_CRS_or_Yale_format)
+* - n - number of rows in matrix A
+* - acsr - CSR VAL array
+* - icsr - CSR ROW array
+* - jcsr - CSR COLUMN array
+* - x - vector that we multiply matrix A by
+* - y - result vector
 ***************************************************************************************************************/
 inline void compute_sparse_Ax_y(const std::size_t & n, double * acsr, int * icsr, int  * jcsr, double * x, double * y){
-		
-		for(std::size_t i=0;i<n;i++){
-			double sum=0.;
+    // iterate over rows 
+		for(std::size_t i = 0; i < n; i++) {
+			double sum = 0;
 			int col;
-			for(int j=icsr[i];j<=icsr[i+1]-1;j++){
+			for(int j = icsr[i] ;j<=icsr[i+1]-1; j++){
 				col=jcsr[j];
 				sum+=acsr[j]*x[col];
 			}
@@ -305,12 +311,13 @@ inline void compute_sparse_Ax_y(const std::size_t & n, double * acsr, int * icsr
 	}
 
 /***************************************************************************************************************
-*	iloczyn skalarny dwoch wektorow
+*	Compute inner product of two vectors x and y, each of them is of length n
 * 
 ***************************************************************************************************************/
 inline double scalar_product_x_y(const std::size_t & n, double * x, double * y){
 		double res=0.;
-		for(std::size_t i=0;i<n;i++)res+=x[i]*y[i];
+		for(std::size_t i=0;i<n;i++)
+      res+=x[i]*y[i];
 		return res;
 	}	
 
@@ -652,7 +659,7 @@ inline void compute_u_v_from_wxy(const std::size_t & number, const std::size_t &
  *  sortujemy wektor elementow macierzowych wzgledem kolumn (format CSR) i wkladamy do macierzy
  *  k - numer wiersza w macierzy ukladu   
  *  l=jcol[0] - liczba elementow niezerowych
- *  acol[1]-acol[l] - elementy niezerowe
+ *  acol[1]..acol[l] - elementy niezerowe
  * 
  *  indeksowanie elementow od 0 - ostatni element w acsr lezy na pozycji acsr [nnz-1]
  * 
