@@ -289,23 +289,28 @@ void solve_linear_system_u_v(std::vector<std::vector<std::vector<double>>> & cry
 *	Compute Ax=y where A is given in CSR format
 * 
 * not comfortable with CSR? https://en.wikipedia.org/wiki/Sparse_matrix#Compressed_sparse_row_(CSR,_CRS_or_Yale_format)
-* - n - number of rows in matrix A
-* - acsr - CSR VAL array
-* - icsr - CSR ROW array
-* - jcsr - CSR COLUMN array
-* - x - vector that we multiply matrix A by
-* - y - result vector
+* - n_rows - number of rows in matrix A
+* - csr_val - CSR VAL array
+* - csr_row - CSR ROW array
+* - csr_column - CSR COLUMN array
+* - input_vector - vector that we multiply matrix A by (x vector)
+* - output_vector - result vector (y vector)
 ***************************************************************************************************************/
-inline void compute_sparse_Ax_y(const std::size_t & n, double * acsr, int * icsr, int  * jcsr, double * x, double * y){
+inline void compute_sparse_Ax_y(const std::size_t& n_rows, 
+                                double* csr_val, 
+                                int* csr_row, 
+                                int* csr_column, 
+                                double* input_vector, 
+                                double* output_vector){
     // iterate over rows 
-		for(std::size_t i = 0; i < n; i++) {
+		for(std::size_t i = 0; i < n_rows; i++) {
 			double sum = 0;
 			int col;
-			for(int j = icsr[i] ;j<=icsr[i+1]-1; j++){
-				col=jcsr[j];
-				sum+=acsr[j]*x[col];
+			for(int j = csr_row[i]; j<=csr_row[i+1]-1; j++){
+				col = csr_column[j];
+				sum += csr_val[j]*input_vector[col];
 			}
-			y[i]=sum;
+			output_vector[i] = sum;
 		}
 		return;
 	}
@@ -314,10 +319,11 @@ inline void compute_sparse_Ax_y(const std::size_t & n, double * acsr, int * icsr
 *	Compute inner product of two vectors x and y, each of them is of length n
 * 
 ***************************************************************************************************************/
-inline double scalar_product_x_y(const std::size_t & n, double * x, double * y){
-		double res=0.;
-		for(std::size_t i=0;i<n;i++)
+inline double scalar_product_x_y(const std::size_t& n, double* x, double* y){
+		double res = 0.;
+		for(std::size_t i = 0; i < n; i++) {
       res+=x[i]*y[i];
+    }
 		return res;
 	}	
 
@@ -665,26 +671,30 @@ inline void compute_u_v_from_wxy(const std::size_t & number, const std::size_t &
  * 
  ***************************************************************************************************************
  ***************************************************************************************************************/
-inline void sort_and_add_matrix_elements(const std::size_t & nrow, const std::size_t & k, std::vector<int> & jcol, std::vector<double> & acol, 
-					    double * acsr, int * icsr, int * jcsr){
-	
-	
-	//sortowanie
-	std::size_t l=static_cast<std::size_t>(jcol[0]); //liczba niezerowych elementow w wierszu
+inline void sort_and_add_matrix_elements(const std::size_t& nrow, 
+                                         const std::size_t & k, 
+                                         std::vector<int> & jcol, 
+                                         std::vector<double> & acol, 
+                                         double * acsr, 
+                                         int * icsr, 
+                                         int * jcsr)
+{	
+	// sorting
+	std::size_t l = static_cast<std::size_t>(jcol[0]); // number of non-zero elements in row
 	int l1,l2;
 	double a1,a2;
 	
-	for(std::size_t i=1;i<l;i++){
-		for(std::size_t j=i;j>=1;j--){
-			l1=jcol[j]; //numery kolumn
-			l2=jcol[j+1];
-			if(l1>l2){  //zamieniamy miejscami 
-				a1=acol[j];
-				a2=acol[j+1];
-				acol[j]=a2;
-				acol[j+1]=a1;
-				jcol[j]=l2;
-				jcol[j+1]=l1;
+	for(std::size_t i=1; i<l; i++){
+		for(std::size_t j=i; j>=1 ;j--){
+			l1 = jcol[j]; //numery kolumn
+			l2 = jcol[j+1];
+			if(l1 > l2){  //zamieniamy miejscami 
+				a1 = acol[j];
+				a2 = acol[j+1];
+				acol[j] = a2;
+				acol[j+1] = a1;
+				jcol[j] = l2;
+				jcol[j+1] = l1;
 			}
 		}	
 	}
@@ -705,8 +715,7 @@ inline void sort_and_add_matrix_elements(const std::size_t & nrow, const std::si
 	
 	
 	//dodajemy elementy do macierzy: acsr, jcsr, icsr
-	int nnz;
-	nnz=icsr[nrow]; //aktualna liczba elementow niezerowych - indeksowane od 0, 
+	int nnz=icsr[nrow]; //aktualna liczba elementow niezerowych - indeksowane od 0, 
 	icsr[k]=nnz; //pozycja nnz jest pusta - od niej zaczynamy wypelnianie wiersza k-tego
 	for(std::size_t i=1;i<=l;i++){
 		acsr[nnz]=acol[i];
