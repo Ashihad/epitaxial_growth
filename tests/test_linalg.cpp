@@ -2,6 +2,7 @@
 #include "gtest_common_define.hpp"
 #include "linalg.hpp"
 
+#include <array>
 #include <vector>
 
 class LinalgTest : public testing::Test {};
@@ -41,7 +42,7 @@ TEST_F(LinalgTest, compute_sparse_Ax_y_basic) {
   }
 }
 
-TEST(LinalgTest, compute_sparse_Ax_y_empty_matrix) {
+TEST_F(LinalgTest, compute_sparse_Ax_y_empty_matrix) {
   // There should be no access when matrix is empty (nullptr access -> segfault)
   std::size_t n = 0;
 
@@ -63,7 +64,7 @@ TEST(LinalgTest, compute_sparse_Ax_y_empty_matrix) {
   EXPECT_EQ(y, expected_y);
 }
 
-TEST(LinalgTest, LargeSparseMatrixTest) {
+TEST_F(LinalgTest, compute_sparse_Ax_y_very_large_matrix) {
   std::size_t n = 10000;  // 10,000 rows
 
   // Allocate arrays for CSR representation
@@ -135,4 +136,31 @@ TEST(LinalgTest, LargeSparseMatrixTest) {
   free(x);
   free(y);
   free(expected_y);
+}
+
+// see https://en.wikipedia.org/wiki/Conjugate_gradient_method#Numerical_example
+TEST_F(LinalgTest, solve_linear_system_CG_standard_basic) {
+  const std::size_t n{2};
+  // A = {{4, 1}, {1, 3}}
+  std::array<double, 4> csr_val{4, 1, 1, 3};
+  std::array<int, 4> csr_col{0, 1, 0, 1};
+  std::array<int, 3> csr_row{0, 2, 4};
+  // b = [1, 2]
+  std::array<double, 2> b{1, 2};
+  // proposed x = [2, 1]
+  std::array<double, 2> x{2, 1};
+  std::size_t itmax{10};
+  double tolerance{1e-5};
+  solve_linear_system_CG_standard(n, csr_val.data(), csr_row.data(),
+                                  csr_col.data(), b.data(), x.data(), &itmax,
+                                  &tolerance);
+  std::array<double, 2> x_expected{1 / 11., 7 / 11.};
+  std::cout << COUT_GTEST << ANSI_TXT_DFT << "x[0] = " << x[0] << '\n';
+  std::cout << COUT_GTEST << ANSI_TXT_DFT << "x_expected[0] = " << x_expected[0]
+            << '\n';
+  std::cout << COUT_GTEST << ANSI_TXT_DFT << "iterations = " << itmax << '\n';
+  std::cout << COUT_GTEST << ANSI_TXT_DFT << "tolerance = " << tolerance
+            << '\n';
+  EXPECT_DOUBLE_EQ(x[0], x_expected[0]);
+  EXPECT_DOUBLE_EQ(x[1], x_expected[1]);
 }

@@ -5,33 +5,6 @@
 #include <cmath>
 #include <cstdio>
 
-/***********************************************************************************************
- * rozwiazujemy uklad rownan (IERR=0) LUB liczymy blad lokalny rozwiazania
- *(IERR=1)
- *
- * tablica: crystal[0:nx-1][0:ny-1][k]
- *          crystal[0:nx-1][0:ny-1][0]=0,1,2 - empty/substrate,deposited atom
- *          crystal[0:nx-1][0:ny-1][1]=uij - shift in x
- *          crystal[0:nx-1][0:ny-1][2]=vij - shift in y
- *          crystal[0:nx-1][0:ny-1][3]=l - global index for uij
- *          crystal[0:nx-1][0:ny-1][4]=l+1 - global index for vij
- *          crystal[0:nx-1][0:ny-1][3]=-1 - boundary or outside of linear system
- *
- * zakres ukladu rownan obejmuje: [imin:imax,jmin:jmax]
- *
- * imin         - poczatek zakresu atomow do relaksacji
- * imax=imin+i_nodes - koniec zakresu atomow do relaksacji
- *
- * macierz ukladu rownan w formacie CSR: acsr,icsr,jcsr
- * rozwiazanie ukladu iteracyjne: Conjugate Gradients
- *
- *
- * iterations - maksymalna liczba iteracji CG
- * tolerance - dopuszczalna tolerancja bledu rozwiazania CG
- * ierr=0,1:  0-rozwiazujemy uklad rownan, 1-liczymy norme max aktualnego
- *rozwiazania
- *
- ************************************************************************************************/
 void solve_linear_system_u_v(
     std::vector<std::vector<std::vector<double>>>& crystal,
     std::size_t imin,
@@ -47,26 +20,24 @@ void solve_linear_system_u_v(
     double* tolerance,
     int ierr,
     double* bmax) {
-  auto s1 = std::chrono::high_resolution_clock::now();
+  auto start_time = std::chrono::high_resolution_clock::now();
 
-  std::size_t nx = crystal.size();     // liczba komorek w x
-  std::size_t ny = crystal[0].size();  // liczba komorek w y
+  // grid x size
+  std::size_t nx = crystal.size();
+  // grid y size
+  std::size_t ny = crystal[0].size();
 
-  // sprawdzamy dolny i gorny zakres aby nie wyjsc za tablice
+  // check boundaries to prevent out-of-memory access
   if (jmin < 1 || jmax > ny - 2) {
     jmin = std::max(jmin, 1ul);
     jmax = std::min(jmax, ny - 2ul);
   }
 
-  // wczesniej: int imax=imin+abs(inodes);
-  std::size_t imax =
-      imin +
-      i_nodes;  // imax moze byc wieksze od (nx-1) - indeks jest renormalizowany
+  // NOTE: imax can be bigger than (nx-1) - index is renormalized
+  std::size_t imax = imin + i_nodes;
 
-  /*
-   * usuwamy stare indeksy globalne, wpisujemy blokade (wb Dirichleta): -1
-   * jesli pozniej zmienimy numer (0,1,2,3,...) to bedzie warunek Neumanna
-   */
+  // delete old global indexes, insert blockade (-1: Dirichlet boundary
+  // condition), numbers (0,1,2,3,...) dictate Neumann boundary condition
   for (std::size_t i = 0; i < nx; i++) {
     for (std::size_t j = 0; j < ny; j++) {
       crystal[i][j][3] = -1;
@@ -120,15 +91,12 @@ void solve_linear_system_u_v(
   jcol.resize(ncol + 10,
               0);  // w zerowym indeksie zapisujemy liczbe elementow w wierszu
 
-  /*
-   * tablice globalne do rozwiazywania ukladu rownan - allokacja jak w C
-   *
-   */
+  // tablice globalne do rozwiazywania ukladu rownan - allokacja jak w C
 
   std::size_t nmax =
       nrow * 9 *
       2;  // maksymalna liczba niezerowych elementow w wierszu * liczba wierszy
-  double* acsr = static_cast<double*>(malloc(nmax * sizeof(double)));
+  double* csr_val = static_cast<double*>(malloc(nmax * sizeof(double)));
   int* icsr = static_cast<int*>(malloc((nrow + 1) * sizeof(int)));
   icsr[nrow] = 0;  // aktualna liczba NNZ	w macierzy ukladu
   int* jcsr = static_cast<int*>(malloc(nmax * sizeof(int)));
@@ -136,8 +104,8 @@ void solve_linear_system_u_v(
   double* xx = static_cast<double*>(malloc(nrow * sizeof(double)));
   double* bb = static_cast<double*>(malloc(nrow * sizeof(double)));
 
-  // tworzymy tablice lokalnego otoczenia punktu 3x3
-  /*
+  /**
+   * tworzymy tablice lokalnego otoczenia punktu 3x3
    *   00  01  02    - numeracja wezlow w otoczeniu wezla (i,j) centralnego (11)
    *   10 (11) 12
    *   20  21  22
@@ -214,7 +182,7 @@ void solve_linear_system_u_v(
 
     /*================================================================================
      * *********** liczymy elementy: A, F ******************************
-     * A: format CSR - macierz rzadka (acsr,icsr,jcsr)
+     * A: format CSR - macierz rzadka (csr_val,icsr,jcsr)
      * F=ff[nrow] - wektor wyrazow wolnych
      *
      *================================================================================*/
@@ -240,14 +208,11 @@ void solve_linear_system_u_v(
       compute_u_v_from_wxy(number, k, i, j, nx, skd, ip, iboundary, d1, crystal,
                            acol, jcol, ff);
     }
-    sort_and_add_matrix_elements(nrow, k, jcol, acol, acsr, icsr, jcsr);
+    sort_and_add_matrix_elements(nrow, k, jcol, acol, csr_val, icsr, jcsr);
   }  // k=row index
 
-  /******************************************************
-   * rozwiazujemy uklad rownan A*(uv)=ff
-   *         Conjugate Gradients
-   *
-   ******************************************************/
+  // rozwiazujemy uklad rownan A*(uv)=ff
+  // Conjugate Gradients
   std::size_t itmax0 = *iterations;
 
   for (std::size_t i = 0; i < nrow; i++)
@@ -262,17 +227,14 @@ void solve_linear_system_u_v(
   }
 
   auto s2 = std::chrono::high_resolution_clock::now();
-  /****************************************************************************************
-   * ierr=0,1:
-   * 			0 - rozwiazujemy uklad rownan
-   * 			1 - liczymy blad lokalny jak w publikacji
-   *
-   ****************************************************************************************/
 
+  // ierr=0,1:
+  // 0 - rozwiazujemy uklad rownan
+  // 1 - liczymy blad lokalny jak w publikacji
   if (ierr == 0) {  // rozwiazujemy uklad rownan
 
-    solve_linear_system_CG_standard(nrow, acsr, icsr, jcsr, ff, xx, iterations,
-                                    tolerance);
+    solve_linear_system_CG_standard(nrow, csr_val, icsr, jcsr, ff, xx,
+                                    iterations, tolerance);
 
     if (*tolerance >= 1.0E-3 || *iterations >= itmax0) {
       printf("solution:  iterations,  tolerance  =   %6ld   %15.5E  \n\n",
@@ -290,7 +252,7 @@ void solve_linear_system_u_v(
   }
 
   // norma max z wektora reszt - liczymy zawsze: ierr-dowolne
-  compute_sparse_Ax_y(nrow, acsr, icsr, jcsr, xx, bb);  // bb = Acsr*xx
+  compute_sparse_Ax_y(nrow, csr_val, icsr, jcsr, xx, bb);  // bb = csr_val*xx
   *bmax = 0.;
   for (std::size_t i = 0; i < nrow; i++) {
     bb[i] = bb[i] - ff[i];
@@ -299,12 +261,11 @@ void solve_linear_system_u_v(
   }
 
   auto s3 = std::chrono::high_resolution_clock::now();
-  auto s21 = std::chrono::duration_cast<std::chrono::microseconds>(s2 - s1);
+  auto s21 =
+      std::chrono::duration_cast<std::chrono::microseconds>(s2 - start_time);
   auto s32 = std::chrono::duration_cast<std::chrono::microseconds>(s3 - s2);
-  // printf("+++>   %15.5E   %15.5E    %d   %d
-  // %15.5E\n",s21*1.0E-6,s32*1.0E-6,*iterations,itmax0,*tolerance);
 
-  free(acsr);
+  free(csr_val);
   free(icsr);
   free(jcsr);
   free(ff);
@@ -313,18 +274,6 @@ void solve_linear_system_u_v(
 
 }  // solve Au=F:end
 
-/***************************************************************************************************************
- *	Compute Ax=y where A is given in CSR format
- *
- * not comfortable with CSR?
- *https://en.wikipedia.org/wiki/Sparse_matrix#Compressed_sparse_row_(CSR,_CRS_or_Yale_format)
- * - n_rows - number of rows in matrix A
- * - csr_val - CSR VAL array
- * - csr_row - CSR ROW array
- * - csr_column - CSR COLUMN array
- * - input_vector - vector that we multiply matrix A by (x vector)
- * - output_vector - result vector (y vector)
- ***************************************************************************************************************/
 inline void compute_sparse_Ax_y(const std::size_t& n_rows,
                                 double* csr_val,
                                 int* csr_row,
@@ -344,11 +293,6 @@ inline void compute_sparse_Ax_y(const std::size_t& n_rows,
   return;
 }
 
-/***************************************************************************************************************
- *	Compute inner product of two vectors x and y, each of them is of length
- *n
- *
- ***************************************************************************************************************/
 inline double scalar_product_x_y(const std::size_t& n, double* x, double* y) {
   double res = 0.;
   for (std::size_t i = 0; i < n; i++) {
@@ -357,115 +301,119 @@ inline double scalar_product_x_y(const std::size_t& n, double* x, double* y) {
   return res;
 }
 
-/***************************************************************************************************************
-****************************************************************************************************************
-*	solve linear equations system: CG - standard algorithm - Saad
-*
-****************************************************************************************************************
-***************************************************************************************************************/
 void solve_linear_system_CG_standard(const std::size_t& n,
-                                     double* acsr,
-                                     int* icsr,
-                                     int* jcsr,
+                                     double* csr_val,
+                                     int* csr_row,
+                                     int* csr_col,
                                      double* b,
                                      double* x,
                                      std::size_t* itmax,
-                                     double* tol) {
-  // sprawdzamy wektor wyrazow wolnych: jesli jest pusty to zwracamy rozwiazanie
-  // trywialne vec{x}=0
+                                     double* tolerance) {
+  // if b is zero vector, return trivial solution x={0,...}
   double b_2 = scalar_product_x_y(n, b, b);
   if (b_2 < 1.0E-10) {
-    for (std::size_t i = 0; i < n; i++)
+    for (std::size_t i = 0; i < n; i++) {
       x[i] = 0.;
+    }
     *itmax = 0;
-    *tol = 0.;
+    *tolerance = 0.;
     return;
   }
 
-  // algorytm CG
+  // residual vectors
   double* rj = static_cast<double*>(malloc(n * sizeof(double)));
-  double* rjp1 = static_cast<double*>(malloc(n * sizeof(double)));
+  double* rj_proposed = static_cast<double*>(malloc(n * sizeof(double)));
+  // approximate solution vectors
   double* xj = static_cast<double*>(malloc(n * sizeof(double)));
-  double* xjp1 = static_cast<double*>(malloc(n * sizeof(double)));
-  double* tmp1 = static_cast<double*>(malloc(n * sizeof(double)));
-  double* Apj = static_cast<double*>(malloc(n * sizeof(double)));
+  double* xj_proposed = static_cast<double*>(malloc(n * sizeof(double)));
+  // vector for storing A*x0
+  double* A_times_x0 = static_cast<double*>(malloc(n * sizeof(double)));
+  // matrix-vector product result (A*pj)
+  double* A_times_pj = static_cast<double*>(malloc(n * sizeof(double)));
+  // direction vectors
   double* pj = static_cast<double*>(malloc(n * sizeof(double)));
-  double* pjp1 = static_cast<double*>(malloc(n * sizeof(double)));
+  double* pj_proposed = static_cast<double*>(malloc(n * sizeof(double)));
 
-  compute_sparse_Ax_y(n, acsr, icsr, jcsr, x, tmp1);  // A*x0
+  // compute initial guess for A*x0, store in tmp1
+  compute_sparse_Ax_y(n, csr_val, csr_row, csr_col, x, A_times_x0);
 
   for (std::size_t i = 0; i < n; i++) {
-    xj[i] = x[i];            // proponowane rozwiazanie
-    rj[i] = b[i] - tmp1[i];  // b-A*x0
+    xj[i] = x[i];                  // initial guess
+    rj[i] = b[i] - A_times_x0[i];  // b-A*x0
     pj[i] = rj[i];
   }
 
   double Apj_2;
   double rj_2;
   double rjp1_2;
-  double err;
+  double approximation_error;
   double alfa;
 
+  // iterate for maximum of itmax iterations
   for (std::size_t j = 0; j < *itmax; j++) {
-    compute_sparse_Ax_y(n, acsr, icsr, jcsr, pj, Apj);  // A*pj
+    // compute A*pj
+    compute_sparse_Ax_y(n, csr_val, csr_row, csr_col, pj, A_times_pj);
+
+    // compute step size alpha = r_j * r_j / (p_j * A * p_j)
     rj_2 = scalar_product_x_y(n, rj, rj);
-    Apj_2 = scalar_product_x_y(n, Apj, pj);
+    Apj_2 = scalar_product_x_y(n, A_times_pj, pj);
     alfa = rj_2 / Apj_2;
     if (fabs(alfa) < 1.0E-5)
-      printf("BLAD CG:  alfa= %15.5E \n", alfa);
+      // step too small
+      printf(
+          "Conjugate Gradient method error, step too small:  alfa= %15.5E \n",
+          alfa);
 
-    for (std::size_t i = 0; i < n; i++)
-      xjp1[i] = xj[i] + alfa * pj[i];
-    for (std::size_t i = 0; i < n; i++)
-      rjp1[i] = rj[i] - alfa * Apj[i];
-    rjp1_2 = scalar_product_x_y(n, rjp1, rjp1);
-    double beta = rjp1_2 / rj_2;
-    for (std::size_t i = 0; i < n; i++)
-      pjp1[i] = rjp1[i] + beta * pj[i];
-
+    // update approximate solution vector
     for (std::size_t i = 0; i < n; i++) {
-      xj[i] = xjp1[i];
-      rj[i] = rjp1[i];
-      pj[i] = pjp1[i];
+      xj_proposed[i] = xj[i] + alfa * pj[i];
     }
 
-    err = sqrt(rj_2) / sqrt(b_2);
+    // update residual vector
+    for (std::size_t i = 0; i < n; i++) {
+      rj_proposed[i] = rj[i] - alfa * A_times_pj[i];
+    }
 
-    if (err < *tol && j > 0) {
+    // compute the update factor beta = r_{j+1} * r_{j+1} / (r_j * r_j)
+    rjp1_2 = scalar_product_x_y(n, rj_proposed, rj_proposed);
+    double beta = rjp1_2 / rj_2;
+    for (std::size_t i = 0; i < n; i++)
+      pj_proposed[i] = rj_proposed[i] + beta * pj[i];
+
+    // insert computed tmp solutions to corresponding vectors
+    for (std::size_t i = 0; i < n; i++) {
+      xj[i] = xj_proposed[i];
+      rj[i] = rj_proposed[i];
+      pj[i] = pj_proposed[i];
+    }
+
+    // compute solution error
+    approximation_error = sqrt(rj_2) / sqrt(b_2);
+    // if error is satisfying, end procedure
+    if (approximation_error < *tolerance && j > 0) {
       *itmax = j;
       break;
     }
   }
-  *tol = err;
+  *tolerance = approximation_error;
 
-  // zapisujemy rozwiazanie
+  // save computed solution
   for (std::size_t i = 0; i < n; i++)
     x[i] = xj[i];
 
-  // zwalniamy pamiec
+  // free memory
   free(rj);
-  free(rjp1);
+  free(rj_proposed);
   free(xj);
-  free(xjp1);
-  free(tmp1);
-  free(Apj);
+  free(xj_proposed);
+  free(A_times_x0);
+  free(A_times_pj);
   free(pj);
-  free(pjp1);
+  free(pj_proposed);
 
   return;
 }  // CG-standard
 
-/***************************************************************************************************************
- ***************************************************************************************************************
- *    liczymy wkladu do wiersza dla wyrazu wxx/wyy - identycznie
- *    number=3,4:
- * 			3-dwxx/duij, d=d1
- * 			4-dwyy/dvij, d=d2
- *
- *    ii=1, jj=1: to punkt centralny
- *
- ***************************************************************************************************************
- ***************************************************************************************************************/
 inline void compute_u_v_from_wxx(
     const std::size_t& number,
     const std::size_t& k,
@@ -611,17 +559,6 @@ inline void compute_u_v_from_wxx(
   return;
 }  // compute_u_v_from_wxx
 
-/***************************************************************************************************************
- ***************************************************************************************************************
- *  liczymy wkladu do wiersza od wxy
- *
- *  number=3,4:
- * 			3-dW/duij
- * 			4-dW/dvij
- *
- *  ii=1, jj=1: to punkt centralny
- ***************************************************************************************************************
- ***************************************************************************************************************/
 inline void compute_u_v_from_wxy(
     const std::size_t& number,
     const std::size_t& k,
@@ -677,7 +614,7 @@ inline void compute_u_v_from_wxy(
     }
   }
 
-  // element: vij*uij  - do diagonali w Acsr
+  // element: vij*uij  - do diagonali w csr_val
   val = (skd / 4. * ip[ii][jj] * ip[ii - 1][jj - 1] +
          skd / 4. * ip[ii][jj] * ip[ii + 1][jj + 1] -
          skd / 4. * ip[ii][jj] * ip[ii + 1][jj - 1] -
@@ -711,22 +648,11 @@ inline void compute_u_v_from_wxy(
   return;
 }  // compute_u_v_from_wxy
 
-/***************************************************************************************************************
- ***************************************************************************************************************
- *  sortujemy wektor elementow macierzowych wzgledem kolumn (format CSR) i
- *wkladamy do macierzy k - numer wiersza w macierzy ukladu l=jcol[0] - liczba
- *elementow niezerowych acol[1]..acol[l] - elementy niezerowe
- *
- *  indeksowanie elementow od 0 - ostatni element w acsr lezy na pozycji acsr
- *[nnz-1]
- *
- ***************************************************************************************************************
- ***************************************************************************************************************/
 inline void sort_and_add_matrix_elements(const std::size_t& nrow,
                                          const std::size_t& k,
                                          std::vector<int>& jcol,
                                          std::vector<double>& acol,
-                                         double* acsr,
+                                         double* csr_val,
                                          int* icsr,
                                          int* jcsr) {
   // sorting
@@ -765,13 +691,13 @@ inline void sort_and_add_matrix_elements(const std::size_t& nrow,
     }
   }
 
-  // dodajemy elementy do macierzy: acsr, jcsr, icsr
+  // dodajemy elementy do macierzy: csr_val, jcsr, icsr
   int nnz =
       icsr[nrow];  // aktualna liczba elementow niezerowych - indeksowane od 0,
   icsr[k] = nnz;   // pozycja nnz jest pusta - od niej zaczynamy wypelnianie
                    // wiersza k-tego
   for (std::size_t i = 1; i <= l; i++) {
-    acsr[nnz] = acol[i];
+    csr_val[nnz] = acol[i];
     jcsr[nnz] = jcol[i];
     nnz++;
   }
