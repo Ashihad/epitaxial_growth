@@ -1,5 +1,8 @@
 #include <cstddef>
 
+/**
+ * procedura symulacji wzrostu krzystalu: 1+1
+ */
 void growth_simulation(double as,
                        double ag,
                        double al,
