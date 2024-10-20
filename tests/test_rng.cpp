@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <ctime>
 #include <iostream>
+#include <cmath>
 
 class RngTest : public testing::Test {
  protected:
@@ -30,17 +31,17 @@ TEST_F(RngTest, uniform_generator_basic) {
 
 TEST_F(RngTest, gen_discrete_1_K_basic) {
   // Primitive generator test, TODO: make something real
-  int k {9};
+  std::size_t k {9};
 
-  int sum {};
-  std::size_t max_iter {10000};
+  long unsigned sum {};
+  std::size_t max_iter {100000};
   for(std::size_t iter = 0; iter < max_iter; iter++)
   {
     sum += gen_discrete_1_K(k);
   }
-  bool is_ok =  (sum/static_cast<double>(max_iter) <= k/2+1+uniform_eps && 
-                 sum/static_cast<double>(max_iter) >= k/2+1-uniform_eps);
-  std::cout << COUT_GTEST << ANSI_TXT_DFT <<  "sum/max_iter=" << sum/static_cast<double>(max_iter) << '\n';
+  bool is_ok =  (static_cast<double>(sum)/static_cast<double>(max_iter) <= std::floor(static_cast<double>(k)/2)+1 + uniform_eps && 
+                 static_cast<double>(sum)/static_cast<double>(max_iter) >= std::floor(static_cast<double>(k)/2)+1 - uniform_eps);
+  std::cout << COUT_GTEST << ANSI_TXT_DFT <<  "sum/max_iter=" << static_cast<double>(sum)/static_cast<double>(max_iter) << '\n';
   EXPECT_EQ(is_ok, true);
 }
 
