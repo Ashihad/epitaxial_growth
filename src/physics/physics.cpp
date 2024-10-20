@@ -3,18 +3,6 @@
 #include <cmath>
 #include "linalg.hpp"
 
-/*************************************************************************************************************************
- *  relakasacja lokalna/globalna:
- *  iloc=0,1:
- * 			0 - globalna
- * 			1 - lokalna
- * irange_min - minimalny promien otoczenia
- * irange_max - maksymalny promien otoczenia
- * tolerance - tolerancja bledu podczas rozwiazywania ukladu rownan
- * iterations - maksymalna liczba iteracji w metodzie CG
- * tol_local_max - maksymalna akceptowalna wartosc bledu lokalnego
- *
- *************************************************************************************************************************/
 void conduct_relaxation(const std::size_t& ipos,
                         const std::size_t& jpos,
                         const std::size_t& irange_min,
@@ -95,11 +83,6 @@ void conduct_relaxation(const std::size_t& ipos,
   return;
 
 }  // conduct_relaxation
-
-/**************************************************************************************************************************
- * liczymy energie sprezystosci dla atomu (i,j)
- *
- **************************************************************************************************************************/
 
 double compute_elastic_energy_wij(
     const std::size_t& i,
@@ -199,15 +182,6 @@ double compute_elastic_energy_wij(
   return ep;
 }
 
-/**************************************************************************************************************************
- * liczymy wektor gradientu dla wszystkich atomow poza dolnym brzegiem
- *
- *  zwracamy norme wektora gradientu oraz gradient:
- *
- *  crystal[][][6]=dW/du_ij
- *  crystal[][][7]=dW/dv_ij
- *
- **************************************************************************************************************************/
 double compute_gradient(std::size_t nx,
                         std::size_t ny,
                         std::vector<std::vector<std::vector<double>>>& crystal,
