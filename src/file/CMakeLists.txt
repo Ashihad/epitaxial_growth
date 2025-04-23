@@ -1,14 +1,6 @@
-set(LIBRARY_NAME "linalg")
-set(
-  LIBRARY_SOURCES
-  "${CMAKE_CURRENT_SOURCE_DIR}/MathDriver.cpp"
-  "${CMAKE_CURRENT_SOURCE_DIR}/CGDriver.cpp"
-)
-set(
-  LIBRARY_HEADERS
-  "${CMAKE_CURRENT_SOURCE_DIR}/MathDriver.cpp"
-  "${CMAKE_CURRENT_SOURCE_DIR}/CGDriver.cpp"
-)
+set(LIBRARY_NAME "file")
+set(LIBRARY_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/FileHandler.cpp")
+set(LIBRARY_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/FileHandler.hpp")
 set(
   LIBRARY_INCLUDES
   "${CMAKE_SOURCE_DIR}/src/atom"
@@ -24,7 +16,7 @@ set(
 
 add_library(${LIBRARY_NAME} STATIC ${LIBRARY_SOURCES} ${LIBRARY_HEADERS})
 target_include_directories(${LIBRARY_NAME} PUBLIC ${LIBRARY_INCLUDES})
-target_link_libraries(${LIBRARY_NAME} PRIVATE "sim")
+# target_link_libraries(${LIBRARY_NAME} PRIVATE "physics" "rng")
 
 if(${ENABLE_WARNINGS})
   target_set_warnings(

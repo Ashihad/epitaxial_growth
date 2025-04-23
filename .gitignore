@@ -1,63 +1,17 @@
-###########  FILES  ############
-*.pptx
-
-########### FOLDERS ############
+# dirs
 build/
-build-*/
-html/
-Testing/
+release/
+debug/
 
-############ C/C++ #############
-# Prerequisites
-*.d
-# Compiled Object files
-*.slo
-*.lo
-*.o
-*.obj
-*.ko
-*.elf
-# Precompiled Headers
-*.gch
-*.pch
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
-# Fortran module files
-*.mod
-*.smod
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
-# Executables
-*.i*86
-*.x86_64
-*.hex
-*.app
-*.stackdump
-*.exe
-*.out
-# Linker output
-*.ilk
-*.map
-*.exp
-# Debug files
-*.dSYM/
-*.su
-*.idb
-*.pdb
-# Data files
-**/*.dat
+# byproducts in materials/
+materials/*.dat
+materials/*.out
+
+# plotter outputs
+*.png
+
 # Python
 .venv/
 
-################################
-########### VS CODE ############
-################################
-.vscode/settings.json
-.vscode/c_cpp_properties.json
-*.code-workspace
-.history
+# vscode
+.vscode
