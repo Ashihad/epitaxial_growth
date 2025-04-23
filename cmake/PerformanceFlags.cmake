@@ -9,10 +9,10 @@ function(append_performance_compiler_flags)
     # -funroll-loops              - Unroll loops to increase performance
     # -march=native               - Use all hardware-specific features
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-        add_compile_options(-Ofast -fvect-cost-model=unlimited -ftree-vectorize -fpic -fprefetch-loop-arrays -funroll-loops -march=native)
+        add_compile_options(-Ofast -fvect-cost-model=unlimited -ftree-vectorize -fpic -fprefetch-loop-arrays -funroll-loops -march=native -ggdb3)
     elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
         # TODO: Compile under Clang, some options are probably incompatible
-        add_compile_options(-Ofast -fvect-cost-model=unlimited -ftree-vectorize -fpic -fprefetch-loop-arrays -funroll-loops -march=native)
+        add_compile_options(-Ofast -fvect-cost-model=unlimited -ftree-vectorize -fpic -fprefetch-loop-arrays -funroll-loops -march=native -ggdb3)
     else()
         message(ERROR "Unsupported compiler detected!")
     endif()
