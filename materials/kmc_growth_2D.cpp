@@ -1,3 +1,4 @@
+// clang-format off
 /**********************************************************************************************************
  * 
  * program symuluje wzrost krysztalu 1+1
@@ -447,7 +448,7 @@ void growth_simulation(double as, double ag, double al, double skl, double skd, 
 	 **********************************************************************************************************************/	
 		n_at_diff=0; //liczba atomow powierzchniowych podlegajacych dyfuzji
 		for(int i=0;i<nx;i++){
-			for(int j=ny-1;j>=1;j--){
+			for(int j=ny-2;j>=1;j--){
 				int ll=lround(crystal[i][j][0]); //ll=0(brak), 1(podloze), 2(atom wiazki)
 				if(ll>0){					
 					if(ll>=idiffusion){
@@ -948,14 +949,26 @@ double compute_elastic_energy_wij(const int & i, const int & j, const vector<vec
  *    (teraz uzywamy metody iteracyjnej CG)
  * 
  ***************************************************************************/
-
+#include <iomanip>
 double gen_uniform(){
-	return ((double)rand()/RAND_MAX);
+  static unsigned fake_rand{};
+  fake_rand = (1664525 * fake_rand + 1013904223) % (RAND_MAX * 2U + 1U);
+  // std::cout << "gen_uniform returns " << std::setprecision(20)
+  //           << static_cast<double>(fake_rand) /
+  //                  static_cast<double>(RAND_MAX * 2U + 1U)
+  //           << std::endl;
+  return (static_cast<double>(fake_rand) / static_cast<double>(RAND_MAX * 2U + 1U));
+	// return ((double)rand()/RAND_MAX);
 }
 
 
 int gen_discrete_1_K(const int & K){
-	int k1=lround(floor(gen_uniform()*K)+1);	
+  double uniform{gen_uniform()};
+  // std::cout << "gen_discrete_1_K returns "
+  //           << static_cast<int>(
+  //                  lround(floor(uniform * static_cast<double>(K)) + 1))
+  //           << '\n';
+	int k1=lround(floor(uniform*K)+1);	
 	return k1;
 }
 
@@ -966,7 +979,11 @@ int gen_sign(){
 }
 
 int gen_discrete_1_K_multiply_sign( const int & K){
-	return gen_discrete_1_K(K)*gen_sign();
+  int discrete{gen_discrete_1_K(K)};
+  int sign{gen_sign()};
+  // std::cout << "gen_discrete_1_K_sign returns "
+  //           << static_cast<int>(discrete) * sign << '\n';
+	return discrete*sign;
 }
 
 
@@ -1720,3 +1737,4 @@ inline void compute_u_v_from_wxy(const int & number, const int & k, const int & 
 			
 			return;
 }//compute_u_v_from_wxy
+// clang-format on

@@ -7,6 +7,7 @@ g++ -Ofast -fdefault-real-8  -fdefault-double-8  -w \
            -funroll-loops \
            -march=native \
            -flto \
+	   -ggdb3 \
            *.cpp \
-            -lpthread -lm -ldl -o new.out        
+            -lpthread -lm -ldl -o release.out        
 
