@@ -1,4 +1,6 @@
+add_subdirectory(atom)
+add_subdirectory(atom_diffused)
+add_subdirectory(file)
 add_subdirectory(linalg)
-add_subdirectory(physics)
 add_subdirectory(rng)
 add_subdirectory(sim)
