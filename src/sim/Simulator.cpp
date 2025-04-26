@@ -60,9 +60,9 @@ void Simulator::init_grid() {
     }
   }
 
-  // setting up four monolayers of adatoms
+  // setting up five monolayers of adatoms
   for (auto& col : m_grid) {
-    for (std::size_t j = m_substrate_height; j < m_substrate_height + 4; ++j) {
+    for (std::size_t j = m_substrate_height; j < m_substrate_height + 5; ++j) {
       col[j].type = ATOM_TYPE::ADATOM;  // 0-empty, 1-Si, 2-Ge
     }
   }

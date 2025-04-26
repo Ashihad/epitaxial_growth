@@ -312,8 +312,8 @@ void CGDriver::apply_CG_standard(const std::size_t& row_count,
                                  double* b,
                                  double* x) {
   // if b is zero vector, return trivial solution x={0,...}
-  double b_2 = scalar_product(row_count, b, b);
-  if (b_2 < 1.0E-10) {
+  double f_2 = scalar_product(row_count, b, b);
+  if (f_2 < 1.0E-10) {
     for (std::size_t i = 0; i < row_count; i++) {
       x[i] = 0.;
     }
@@ -392,7 +392,7 @@ void CGDriver::apply_CG_standard(const std::size_t& row_count,
     }
 
     // compute solution error
-    approximation_error = sqrt(rj_2) / sqrt(b_2);
+    approximation_error = sqrt(rj_2) / sqrt(f_2);
     // if error is satisfying, end procedure
     if (approximation_error < tolerance && j > 0) {
       last_iterations_no = j;
