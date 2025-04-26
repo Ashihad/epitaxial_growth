@@ -47,11 +47,10 @@ void FileHandler::save_grid(const Grid& grid) {
           << std::setw(8) << "atom"
           << std::setw(15) << "elastic_e" << '\n';
   // clang-format on
-
+  std::size_t x_pos = 0;
   for (const auto& col : grid) {
-    std::size_t x_pos = 0;
+    std::size_t y_pos = 0;
     for (const auto& atom : col) {
-      std::size_t y_pos = 0;
       if (atom.type != ATOM_TYPE::NO_ATOM) {
         // clang-format off
         grid_fd << std::setw(8) << x_pos
@@ -79,10 +78,10 @@ void FileHandler::save_elastic_energy(const Grid& grid) {
   // clang-format on
 
   // data
+  std::size_t x_pos = 0;
   for (const auto& col : grid) {
-    std::size_t x_pos = 0;
+    std::size_t y_pos = 0;
     for (const auto& atom : col) {
-      std::size_t y_pos = 0;
       const double grad_loc_2 =
           std::pow(atom.grad_x, 2) + std::pow(atom.grad_y, 2);
       // clang-format off
@@ -109,6 +108,10 @@ void FileHandler::save_tmp(const Grid& grid) {
              << static_cast<int>(atom.type) << "  "
              << atom.u << " "
              << atom.v << " "
+             << atom.boundary1 << " "
+             << atom.boundary2 << " "
+             << atom.param_5 << " "
+             << atom.param_6 << " "
              << atom.grad_x << " "
              << atom.grad_y << " "
              << atom.el_energy << " "
