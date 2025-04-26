@@ -103,15 +103,15 @@ void CGDriver::solve_linear_system(const std::size_t imin,
 
   // maksymalna liczba niezerowych elementow w wierszu * liczba wierszy
   const std::size_t nmax = row_count * 9 * 2;
-  double* csr_val = static_cast<double*>(malloc(nmax * sizeof(double)));
-  int* icsr = static_cast<int*>(malloc((row_count + 1) * sizeof(int)));
+  std::unique_ptr<double[]> csr_val{new double[nmax]};
+  std::unique_ptr<int[]> icsr{new int[row_count + 1]};
   // aktualna liczba elementów niezerowych w macierzy ukladu
   icsr[row_count] = 0;
-  int* jcsr = static_cast<int*>(malloc(nmax * sizeof(int)));
+  std::unique_ptr<int[]> jcsr{new int[nmax]};
 
-  double* ff = static_cast<double*>(malloc(row_count * sizeof(double)));
-  double* xx = static_cast<double*>(malloc(row_count * sizeof(double)));
-  double* bb = static_cast<double*>(malloc(row_count * sizeof(double)));
+  std::unique_ptr<double[]> ff{new double[row_count]};
+  std::unique_ptr<double[]> xx{new double[row_count]};
+  std::unique_ptr<double[]> bb{new double[row_count]};
 
   /**
    * tworzymy tablice lokalnego otoczenia punktu 3x3
@@ -201,16 +201,17 @@ void CGDriver::solve_linear_system(const std::size_t imin,
 
     if (number == 3) {
       compute_u_v_from_wxx(number, k, i_central, j_central, grid_x, ip,
-                           iboundary, d1_matrix, grid, acol, jcol, ff);
+                           iboundary, d1_matrix, grid, acol, jcol, ff.get());
       compute_u_v_from_wxy(number, k, i_central, j_central, grid_x, ip,
-                           iboundary, d2_matrix, grid, acol, jcol, ff);
+                           iboundary, d2_matrix, grid, acol, jcol, ff.get());
     } else if (number == 4) {
       compute_u_v_from_wxx(number, k, i_central, j_central, grid_x, ip,
-                           iboundary, d2_matrix, grid, acol, jcol, ff);
+                           iboundary, d2_matrix, grid, acol, jcol, ff.get());
       compute_u_v_from_wxy(number, k, i_central, j_central, grid_x, ip,
-                           iboundary, d1_matrix, grid, acol, jcol, ff);
+                           iboundary, d1_matrix, grid, acol, jcol, ff.get());
     }
-    sort_and_add_matrix_elements(row_count, k, jcol, acol, csr_val, icsr, jcsr);
+    sort_and_add_matrix_elements(row_count, k, jcol, acol, csr_val.get(),
+                                 icsr.get(), jcsr.get());
   }  // k=row index
 
   // rozwiazujemy uklad rownan A*(uv)=ff
@@ -239,7 +240,8 @@ void CGDriver::solve_linear_system(const std::size_t imin,
   if (ierr == 0) {
     // rozwiazujemy uklad rownan
 
-    apply_CG_standard(row_count, csr_val, icsr, jcsr, ff, xx);
+    apply_CG_standard(row_count, csr_val.get(), icsr.get(), jcsr.get(),
+                      ff.get(), xx.get());
 
     if (last_tolerance >= 1.0E-3 || last_iterations_no >= itmax0) {
       printf("solution:  iterations,  tolerance  =   %6ld   %15.5E  \n\n",
@@ -260,22 +262,15 @@ void CGDriver::solve_linear_system(const std::size_t imin,
   }
 
   // norma max z wektora reszt - liczymy zawsze: ierr-dowolne
-  compute_sparse_Ax_y(row_count, csr_val, icsr, jcsr, xx,
-                      bb);  // bb = csr_val*xx
+  compute_sparse_Ax_y(row_count, csr_val.get(), icsr.get(), jcsr.get(),
+                      xx.get(),
+                      bb.get());  // bb = csr_val*xx
   *bmax = 0.;
   for (std::size_t i = 0; i < row_count; i++) {
     bb[i] = bb[i] - ff[i];
     if (std::fabs(bb[i]) > *bmax)
       *bmax = std::fabs(bb[i]);
   }
-
-  free(csr_val);
-  free(icsr);
-  free(jcsr);
-  free(ff);
-  free(xx);
-  free(bb);
-
 }  // solve Au=F:end
 
 void CGDriver::compute_sparse_Ax_y(const std::size_t& n_rows,
@@ -323,24 +318,22 @@ void CGDriver::apply_CG_standard(const std::size_t& row_count,
   }
 
   // residual vectors
-  double* rj = static_cast<double*>(malloc(row_count * sizeof(double)));
-  double* rj_proposed =
-      static_cast<double*>(malloc(row_count * sizeof(double)));
+  std::unique_ptr<double[]> rj{new double[row_count]};
+  std::unique_ptr<double[]> rj_proposed{new double[row_count]};
   // approximate solution vectors
-  double* xj = static_cast<double*>(malloc(row_count * sizeof(double)));
-  double* xj_proposed =
-      static_cast<double*>(malloc(row_count * sizeof(double)));
+  std::unique_ptr<double[]> xj{new double[row_count]};
+  std::unique_ptr<double[]> xj_proposed{new double[row_count]};
   // vector for storing A*x0
-  double* A_times_x0 = static_cast<double*>(malloc(row_count * sizeof(double)));
+  std::unique_ptr<double[]> A_times_x0{new double[row_count]};
   // matrix-vector product result (A*pj)
-  double* A_times_pj = static_cast<double*>(malloc(row_count * sizeof(double)));
+  std::unique_ptr<double[]> A_times_pj{new double[row_count]};
   // direction vectors
-  double* pj = static_cast<double*>(malloc(row_count * sizeof(double)));
-  double* pj_proposed =
-      static_cast<double*>(malloc(row_count * sizeof(double)));
+  std::unique_ptr<double[]> pj{new double[row_count]};
+  std::unique_ptr<double[]> pj_proposed{new double[row_count]};
 
   // compute initial guess for A*x0, store in tmp1
-  compute_sparse_Ax_y(row_count, csr_val, csr_row, csr_col, x, A_times_x0);
+  compute_sparse_Ax_y(row_count, csr_val, csr_row, csr_col, x,
+                      A_times_x0.get());
 
   for (std::size_t i = 0; i < row_count; i++) {
     xj[i] = x[i];                  // initial guess
@@ -357,11 +350,12 @@ void CGDriver::apply_CG_standard(const std::size_t& row_count,
   // iterate for maximum of itmax iterations
   for (std::size_t j = 0; j < max_iterations; j++) {
     // compute A*pj
-    compute_sparse_Ax_y(row_count, csr_val, csr_row, csr_col, pj, A_times_pj);
+    compute_sparse_Ax_y(row_count, csr_val, csr_row, csr_col, pj.get(),
+                        A_times_pj.get());
 
     // compute step size alpha = r_j * r_j / (p_j * A * p_j)
-    rj_2 = scalar_product(row_count, rj, rj);
-    Apj_2 = scalar_product(row_count, A_times_pj, pj);
+    rj_2 = scalar_product(row_count, rj.get(), rj.get());
+    Apj_2 = scalar_product(row_count, A_times_pj.get(), pj.get());
     alfa = rj_2 / Apj_2;
     if (std::fabs(alfa) < 1.0E-5)
       // step too small
@@ -379,7 +373,7 @@ void CGDriver::apply_CG_standard(const std::size_t& row_count,
     }
 
     // compute the update factor beta = r_{j+1} * r_{j+1} / (r_j * r_j)
-    rjp1_2 = scalar_product(row_count, rj_proposed, rj_proposed);
+    rjp1_2 = scalar_product(row_count, rj_proposed.get(), rj_proposed.get());
     double beta = rjp1_2 / rj_2;
     for (std::size_t i = 0; i < row_count; i++)
       pj_proposed[i] = rj_proposed[i] + beta * pj[i];
@@ -404,16 +398,6 @@ void CGDriver::apply_CG_standard(const std::size_t& row_count,
   // save computed solution
   for (std::size_t i = 0; i < row_count; i++)
     x[i] = xj[i];
-
-  // free memory
-  free(rj);
-  free(rj_proposed);
-  free(xj);
-  free(xj_proposed);
-  free(A_times_x0);
-  free(A_times_pj);
-  free(pj);
-  free(pj_proposed);
 }  // CG-standard
 
 void CGDriver::compute_u_v_from_wxx(const std::size_t mode,
