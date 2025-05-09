@@ -8,38 +8,22 @@ FileHandler::FileHandler()
     : grid_filename{"grid.dat"},
       energy_filename{"energies.dat"},
       tmp_filename{"tmp.dat"},
-      grid_fd{grid_filename},
-      energy_fd{energy_filename},
-      tmp_fd{tmp_filename} {
+      grid_fd{},
+      energy_fd{},
+      tmp_fd{} {}
+
+FileHandler::~FileHandler() {}
+
+// save grid above deposited atoms
+void FileHandler::save_grid(const Grid& grid) {
+  grid_fd.open(grid_filename, std::ios::out | std::ios::trunc);
   if (grid_fd.fail()) {
     std::cerr << "Unable to open grid file " << grid_filename << " for write"
               << std::endl;
     throw std::runtime_error("Cannot open grid file " + grid_filename);
   }
-  if (energy_fd.fail()) {
-    std::cerr << "Unable to open energy file " << energy_filename
-              << " for write" << std::endl;
-    throw std::runtime_error("Cannot open energy file " + energy_filename);
-  }
-  if (tmp_fd.fail()) {
-    std::cerr << "Unable to open tmp file " << tmp_filename << " for write"
-              << std::endl;
-    throw std::runtime_error("Cannot open tmp file " + tmp_filename);
-  }
   grid_fd << std::scientific << std::setprecision(5);
-  energy_fd << std::scientific << std::setprecision(5);
-  tmp_fd << std::scientific << std::setprecision(5);
-}
 
-FileHandler::~FileHandler() {
-  // close file descriptors
-  grid_fd.close();
-  energy_fd.close();
-  tmp_fd.close();
-}
-
-// save grid above deposited atoms
-void FileHandler::save_grid(const Grid& grid) {
   // header
   // clang-format off
   grid_fd << "#      i"
@@ -63,11 +47,19 @@ void FileHandler::save_grid(const Grid& grid) {
     }
     x_pos++;
   }
-  std::flush(grid_fd);
+  grid_fd.close();
 }
 
-// save elastic energy???
+// save elastic energy
 void FileHandler::save_elastic_energy(const Grid& grid) {
+  energy_fd.open(energy_filename, std::ios::out | std::ios::trunc);
+  if (energy_fd.fail()) {
+    std::cerr << "Unable to open energy file " << energy_filename
+              << " for write" << std::endl;
+    throw std::runtime_error("Cannot open energy file " + energy_filename);
+  }
+  energy_fd << std::scientific << std::setprecision(5);
+
   // header
   // clang-format off
   energy_fd << "#      i"
@@ -96,11 +88,18 @@ void FileHandler::save_elastic_energy(const Grid& grid) {
     energy_fd << '\n';
     x_pos++;
   }
-  std::flush(energy_fd);
+  energy_fd.close();
 }
 
+// dump all data in grid
 void FileHandler::save_tmp(const Grid& grid) {
-  // TODO: Numbers Jason, what do they mean?
+  tmp_fd.open(tmp_filename, std::ios::out | std::ios::trunc);
+  if (tmp_fd.fail()) {
+    std::cerr << "Unable to open tmp file " << tmp_filename << " for write"
+              << std::endl;
+    throw std::runtime_error("Cannot open tmp file " + tmp_filename);
+  }
+  tmp_fd << std::scientific << std::setprecision(5);
   for (const auto& col : grid) {
     for (const auto& atom : col) {
       // clang-format off
@@ -119,5 +118,5 @@ void FileHandler::save_tmp(const Grid& grid) {
       // clang-format on
     }
   }
-  std::flush(tmp_fd);
+  tmp_fd.close();
 }
