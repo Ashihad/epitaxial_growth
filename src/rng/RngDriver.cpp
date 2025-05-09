@@ -5,6 +5,8 @@
 #include <cstdlib>
 #include <vector>
 
+#define DEBUG
+
 /***************************************************************************
  *   generatory liczb pseudolosowych
  *
@@ -27,7 +29,7 @@ double RNGDriver::gen_uniform() {
 }
 
 std::size_t RNGDriver::gen_discrete_1_grid_x() {
-  static std::uniform_int_distribution<std::size_t> one_to_grid_x(0,
+  static std::uniform_int_distribution<std::size_t> one_to_grid_x(1,
                                                                   m_grid_x_ref);
   return one_to_grid_x(mt);
 }
@@ -39,38 +41,22 @@ int RNGDriver::gen_discrete_plus_minus_diffusion_range() {
   return plus_minus_diffusion_range(mt);
 }
 
-#include <iomanip>
-#include <iostream>
-
 namespace LegacyRNG {
 
 double gen_uniform() {
+#ifdef DEBUG
   static unsigned fake_rand{};
   fake_rand = (1664525U * fake_rand + 1013904223U) % (RAND_MAX * 2U + 1U);
-  // std::cout << "fake_rand: " << fake_rand
-  //           << ", modulo: " << static_cast<double>(RAND_MAX * 2U + 1U)
-  //           << std::endl;
-  // std::cout << "gen_uniform returns " << std::setprecision(20)
-  //           << static_cast<double>(fake_rand) /
-  //                  static_cast<double>(RAND_MAX * 2U + 1U)
-  //           << std::endl;
   return (static_cast<double>(fake_rand) /
           static_cast<double>(RAND_MAX * 2U + 1U));
-  // return (static_cast<double>(rand()) / RAND_MAX);
+#else
+  return (static_cast<double>(rand()) / RAND_MAX);
+#endif
 }
 
+// generate int from 1 to K INCLUSIVE
 int gen_discrete_1_K(const std::size_t& K) {
-  // generate int from 1 to K INCLUSIVE
   double uniform{gen_uniform()};
-  // std::cout << "gen_discrete_1_K returns "
-  //           << static_cast<int>(
-  //                  lround(floor(uniform * static_cast<double>(K)) + 1))
-  //           << '\n';
-  // if (K != 8)
-  //   std::cout << "K: " << K << ", out:"
-  //             << static_cast<int>(
-  //                    lround(floor(uniform * static_cast<double>(K)) + 1))
-  //             << std::endl;
   return static_cast<int>(lround(floor(uniform * static_cast<double>(K)) + 1));
 }
 
@@ -84,32 +70,7 @@ int gen_sign() {
 int gen_discrete_1_K_multiply_sign(const std::size_t& K) {
   int discrete{gen_discrete_1_K(K)};
   int sign{gen_sign()};
-  // std::cout << "gen_discrete_1_K_sign returns "
-  //           << static_cast<int>(discrete) * sign << '\n';
   return static_cast<int>(discrete) * sign;
 }
 
 }  // namespace LegacyRNG
-
-// void test_gen_discrete_sign(){
-
-// 		int k=8;
-// 		int n=100000;
-// 		vector<double> hist(2*k+1,0.);
-
-// 		for(int i=0;i<n;i++){
-// 			int m=gen_discrete_1_K_multiply_sign(k);
-// 			m=m+k;
-// 			hist[m]++;
-// 		}
-
-// 		FILE *fp;
-// 		fp=fopen("hist_d_s.dat","w");
-
-// 		for(int i=0;i<(2*k+1);i++){
-// 			fprintf(fp,"%6d   %15.5E\n",i-k,hist[i]);
-// 		}
-
-// 		fclose(fp);
-// 		return;
-// 	}
