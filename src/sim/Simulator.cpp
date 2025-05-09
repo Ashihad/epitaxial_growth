@@ -285,7 +285,7 @@ void Simulator::run_loop() {
       m_atoms_diff[i].r_diff += m_atoms_diff[i - 1].r_diff;
     }
 
-    double u1 = LegacyRNG::gen_uniform() * sum_ri;
+    double u1 = rngDriver.gen_uniform() * sum_ri;
     // zabezpieczenie na wypadek gdyby petla nie zadziala
     std::size_t chosen_action = n_at_diff;
     for (std::size_t i = 0; i <= n_at_diff; i++) {
@@ -305,8 +305,7 @@ void Simulator::run_loop() {
       added_atoms_count++;
 
       // polozenie atomu w kierunku x: 0-(nx-1)
-      std::size_t ipos =
-          static_cast<std::size_t>(LegacyRNG::gen_discrete_1_K(m_grid_x)) - 1;
+      std::size_t ipos = rngDriver.gen_discrete_1_grid_x() - 1;
       std::size_t jpos = 0;
 
       for (std::size_t j = m_grid_y - 1; j >= 1; j--) {
@@ -335,8 +334,7 @@ void Simulator::run_loop() {
        *
        ****************************************************************************************************/
       // losowe przesuniecie lewo-prawo
-      int ii_shift =
-          LegacyRNG::gen_discrete_1_K_multiply_sign(m_diffusion_range);
+      int ii_shift = rngDriver.gen_discrete_plus_minus_diffusion_range();
       // aktualna pozycja atomu dyfundujacego
       std::size_t i_old = m_atoms_diff[chosen_action].idx;
       std::size_t j_old = m_atoms_diff[chosen_action].idy;
@@ -408,7 +406,7 @@ void Simulator::run_loop() {
 
       proposed_diffusions++;
 
-      double random_uniform{LegacyRNG::gen_uniform()};
+      double random_uniform{rngDriver.gen_uniform()};
       double probability_border{ri_new / ri_old};
       if (random_uniform < (probability_border)) {
         accepted_diffusions++;
