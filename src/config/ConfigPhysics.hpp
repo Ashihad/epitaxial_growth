@@ -43,5 +43,5 @@ struct ConfigPhysics {
   const double E{0.53};  // [eV]
 
   const double deposition_speed{0.08};  // [layers/second]
-  const double temperature{600};        // [K]
+  const double temperature{800};        // [K]
 };

@@ -25,7 +25,7 @@ struct ConfigSimulation {
   const int diffusion_mode{2};
   // TODO: ???
   const double time_fluence{8.0};
-  const double simulation_time{100.0};
+  const double simulation_time{2.0};
 
   // every dump_data_freq data is saved to files
   const long unsigned dump_data_freq{1000};
