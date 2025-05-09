@@ -1,6 +1,7 @@
 #include "CGDriver.hpp"
 
 #include <iostream>
+#include <limits>
 #include <vector>
 
 #include "Simulator.hpp"
@@ -51,39 +52,33 @@ void CGDriver::solve_linear_system(const std::size_t imin,
     }
   }
 
-  /*
-   * numeracja globalna w ukladzie rownan: nrow -liczba zmiennych/wierszy
-   * indeksacja wierszy: 0:(nrow-1)
-   */
-
   // max no of rows (two directions (x,y))
   const std::size_t nrow_max = (i_nodes + 1) * (jmax - jmin + 1) * 2;
 
-  // index table, initialized with -1
-  std::vector<std::vector<int>> indx;
-  indx.resize(nrow_max, std::vector<int>(3, -1));
+  // index table, x_index, y_index, (move in x(3), move in y(4))
+  std::vector<std::vector<std::size_t>> indx;
+  indx.resize(nrow_max,
+              std::vector<std::size_t>(3, std::numeric_limits<size_t>::max()));
 
   // calculate real no of rows
   std::size_t row_count = 0;
   for (std::size_t i = imin; i <= imax; i++) {
     for (std::size_t j = jmin; j <= jmax; j++) {
-      const std::size_t i_wrapped =
-          (i + grid_x) %
-          (grid_x);  // TODO: fizyczny numer komorki, musimy to wrappować?
+      const std::size_t i_wrapped = i % grid_x;
       // tylko komorki zajete przez atomy
       if (grid[i_wrapped][j].type != ATOM_TYPE::NO_ATOM) {
         // blokada zniesiona
         grid[i_wrapped][j].boundary1 = static_cast<int>(row_count);
-        indx[row_count][0] = static_cast<int>(i_wrapped);
-        indx[row_count][1] = static_cast<int>(j);
+        indx[row_count][0] = i_wrapped;
+        indx[row_count][1] = j;
         // indeks przesuniecie w 'x'
         indx[row_count][2] = 3;
         row_count++;
 
         // blokada zniesiona
         grid[i_wrapped][j].boundary2 = static_cast<int>(row_count);
-        indx[row_count][0] = static_cast<int>(i_wrapped);
-        indx[row_count][1] = static_cast<int>(j);
+        indx[row_count][0] = i_wrapped;
+        indx[row_count][1] = j;
         // indeks przesuniecie w 'y'
         indx[row_count][2] = 4;
         row_count++;
@@ -135,13 +130,9 @@ void CGDriver::solve_linear_system(const std::size_t imin,
    *================================================================================================*/
   for (std::size_t k = 0; k < row_count; k++) {  // numer wiersza globalnego
 
-    // experimental, wcześniej:
-    // int i=indx[k][0]; //atom centralny dla wiersza
-    // int j=indx[k][1];
-
     // atom centralny dla wiersza
-    std::size_t i_central = static_cast<std::size_t>(indx[k][0]);
-    std::size_t j_central = static_cast<std::size_t>(indx[k][1]);
+    std::size_t i_central = indx[k][0];
+    std::size_t j_central = indx[k][1];
 
     // fill helper matrices with 0s
     std::fill(ip.begin()->begin(), ip.back().end(), 0);
@@ -191,7 +182,7 @@ void CGDriver::solve_linear_system(const std::size_t imin,
     jcol[0] = 0;
 
     // number:  3-uij, 4-vij
-    std::size_t number = static_cast<std::size_t>(indx[k][2]);
+    std::size_t number = indx[k][2];
 
     // zerujemy element wektora wyrazow wolnych - usuwamy smieci z poprzednich
     // iteracji
@@ -223,9 +214,9 @@ void CGDriver::solve_linear_system(const std::size_t imin,
 
   // wektor startowy to poprzednie rozwiazanie
   for (std::size_t k = 0; k < row_count; k++) {  // numer wiersza globalnego
-    std::size_t i = static_cast<std::size_t>(indx[k][0]);
-    std::size_t j = static_cast<std::size_t>(indx[k][1]);
-    std::size_t number = static_cast<std::size_t>(indx[k][2]);  // 3-uij, 4-vij
+    std::size_t i = indx[k][0];
+    std::size_t j = indx[k][1];
+    std::size_t number = indx[k][2];  // 3-uij, 4-vij
     // xx[k] = grid[i][j][number - 2];  // number-2: 1-uij, 2-vij
     if (number == 3)
       xx[k] = grid[i][j].u;
@@ -250,10 +241,9 @@ void CGDriver::solve_linear_system(const std::size_t imin,
 
     // zachowujemy nowe polozenia/przesuniecia atomow
     for (std::size_t k = 0; k < row_count; k++) {  // numer wiersza globalnego
-      std::size_t i = static_cast<std::size_t>(indx[k][0]);
-      std::size_t j = static_cast<std::size_t>(indx[k][1]);
-      std::size_t number =
-          static_cast<std::size_t>(indx[k][2]);  // 3-uij, 4-vij
+      std::size_t i = indx[k][0];
+      std::size_t j = indx[k][1];
+      std::size_t number = indx[k][2];  // 3-uij, 4-vij
       if (number == 3)
         grid[i][j].u = xx[k];  // number-2: 1-uij, 2-vij
       else if (number == 4)
@@ -273,7 +263,7 @@ void CGDriver::solve_linear_system(const std::size_t imin,
   }
 }  // solve Au=F:end
 
-void CGDriver::compute_sparse_Ax_y(const std::size_t& n_rows,
+void CGDriver::compute_sparse_Ax_y(const std::size_t n_rows,
                                    double* csr_val,
                                    int* csr_row,
                                    int* csr_column,
@@ -292,7 +282,7 @@ void CGDriver::compute_sparse_Ax_y(const std::size_t& n_rows,
   return;
 }
 
-double CGDriver::scalar_product(const std::size_t& n, double* x, double* y) {
+double CGDriver::scalar_product(const std::size_t n, double* x, double* y) {
   double res = 0.;
   for (std::size_t i = 0; i < n; i++) {
     res += x[i] * y[i];
@@ -300,7 +290,7 @@ double CGDriver::scalar_product(const std::size_t& n, double* x, double* y) {
   return res;
 }
 
-void CGDriver::apply_CG_standard(const std::size_t& row_count,
+void CGDriver::apply_CG_standard(const std::size_t row_count,
                                  double* csr_val,
                                  int* csr_row,
                                  int* csr_col,
@@ -412,10 +402,10 @@ void CGDriver::compute_u_v_from_wxx(const std::size_t mode,
                                     std::array<double, column_count + 10>& acol,
                                     std::array<int, column_count + 10>& jcol,
                                     double* ff) {
+  // matrix central i index
   std::size_t ii = 1;
+  // matrix central j index
   std::size_t jj = 1;
-  std::size_t lu;
-  std::size_t i3;
   double val;
 
   // u_{ij}
@@ -428,7 +418,7 @@ void CGDriver::compute_u_v_from_wxx(const std::size_t mode,
           m_spring_const_next_neighbors / 2. * ip[ii][jj] * ip[ii - 1][jj + 1];
     val = val * (-1);  // pochodna wewnetrzna
 
-    lu = static_cast<std::size_t>(jcol[0] + 1);
+    std::size_t lu = static_cast<std::size_t>(jcol[0] + 1);
     jcol[0] = static_cast<int>(lu);
     jcol[lu] =
         static_cast<int>(std::lround(grid[i_central][j_central].boundary1));
@@ -461,7 +451,7 @@ void CGDriver::compute_u_v_from_wxx(const std::size_t mode,
           m_spring_const_next_neighbors / 2. * ip[ii][jj] * ip[ii + 1][jj - 1] -
           m_spring_const_next_neighbors / 2. * ip[ii][jj] * ip[ii - 1][jj + 1];
     val = val * (-1);  // pochodna wewnetrzna
-    lu = static_cast<std::size_t>(jcol[0] + 1);
+    std::size_t lu = static_cast<std::size_t>(jcol[0] + 1);
     jcol[0] = static_cast<int>(lu);
     jcol[lu] = static_cast<int>(lround(grid[i_central][j_central].boundary2));
     acol[lu] = val;
@@ -490,13 +480,13 @@ void CGDriver::compute_u_v_from_wxx(const std::size_t mode,
       std::size_t i_offset =
           static_cast<std::size_t>(static_cast<int>(ii) + im);
       std::size_t j_offset = jj + jm;
-      i3 = static_cast<std::size_t>(
+      std::size_t i3 = static_cast<std::size_t>(
           (static_cast<int>(i_central) + im + static_cast<int>(grid_x)) %
           static_cast<int>(grid_x));
       val = m_spring_const_neighbors * ip[ii][jj] * ip[i_offset][j_offset];
       val = val * (-1);  // pochodna wewnetrzna
       if (iboundary[i_offset][j_offset] == 1) {
-        lu = static_cast<std::size_t>(jcol[0]) + 1;
+        std::size_t lu = static_cast<std::size_t>(jcol[0]) + 1;
         jcol[0] = static_cast<int>(lu);
         // jcol[lu] = static_cast<int>(lround(grid[i3][j_central + jm][mode]));
         jcol[lu] = static_cast<int>(lround(grid[i3][j_central + jm].boundary1));
@@ -514,11 +504,11 @@ void CGDriver::compute_u_v_from_wxx(const std::size_t mode,
       std::size_t i_offset = ii + im;
       std::size_t j_offset =
           static_cast<std::size_t>(static_cast<int>(jj) + jm);
-      i3 = (i_central + im + grid_x) % grid_x;
+      std::size_t i3 = (i_central + im + grid_x) % grid_x;
       val = m_spring_const_neighbors * ip[ii][jj] * ip[i_offset][j_offset];
       val = val * (-1);  // pochodna wewnetrzna
       if (iboundary[i_offset][j_offset] == 1) {
-        lu = static_cast<std::size_t>(jcol[0] + 1);
+        std::size_t lu = static_cast<std::size_t>(jcol[0] + 1);
         jcol[0] = static_cast<int>(lu);
         jcol[lu] = static_cast<int>(lround(
             grid[i3][static_cast<std::size_t>(static_cast<int>(j_central) + jm)]
@@ -540,14 +530,15 @@ void CGDriver::compute_u_v_from_wxx(const std::size_t mode,
           static_cast<std::size_t>(static_cast<int>(ii) + im);
       std::size_t j_offset =
           static_cast<std::size_t>(static_cast<int>(jj) + jm);
-      i3 = static_cast<std::size_t>(
+      std::size_t i3 = static_cast<std::size_t>(
           (static_cast<int>(i_central) + im + static_cast<int>(grid_x)) %
           static_cast<int>(grid_x));
       val = m_spring_const_next_neighbors / 2. * ip[ii][jj] *
             ip[i_offset][j_offset];
-      val = val * (-1);                          // pochodna wewnetrzna
-      if (iboundary[i_offset][j_offset] == 1) {  // Neumann
-        lu = static_cast<std::size_t>(jcol[0] + 1);
+      val = val * (-1);  // pochodna wewnetrzna
+      // Neumann
+      if (iboundary[i_offset][j_offset] == 1) {
+        std::size_t lu = static_cast<std::size_t>(jcol[0] + 1);
         jcol[0] = static_cast<int>(lu);
         if (mode == 3)
           jcol[lu] = static_cast<int>(lround(
@@ -560,7 +551,7 @@ void CGDriver::compute_u_v_from_wxx(const std::size_t mode,
                   [static_cast<std::size_t>(static_cast<int>(j_central) + jm)]
                       .boundary2));
         acol[lu] = val;
-      } else if (iboundary[i_offset][j_offset] == 0)  // Dirichlet
+      } else if (iboundary[i_offset][j_offset] == 0) {  // Dirichlet
         if (mode == 3)
           ff[k] -= val * grid[i3][static_cast<std::size_t>(
                                       static_cast<int>(j_central) + jm)]
@@ -569,6 +560,7 @@ void CGDriver::compute_u_v_from_wxx(const std::size_t mode,
           ff[k] -= val * grid[i3][static_cast<std::size_t>(
                                       static_cast<int>(j_central) + jm)]
                              .v;
+      }
     }
   }
 
@@ -630,7 +622,7 @@ void CGDriver::compute_u_v_from_wxy(const std::size_t mode,
                          .boundary2));  // oddzialywanie:
                                         // u->v, v->u
         acol[lu] = val_local;
-      } else if (iboundary[i_offset][j_offset] == 0)
+      } else if (iboundary[i_offset][j_offset] == 0) {
         if (number == 3)
           ff[k] -=
               val_local * crystal[i3][static_cast<std::size_t>(
@@ -641,6 +633,7 @@ void CGDriver::compute_u_v_from_wxy(const std::size_t mode,
               val_local * crystal[i3][static_cast<std::size_t>(
                                           static_cast<int>(j_central) + jm)]
                               .v;
+      }
     }
   }
 
@@ -690,8 +683,8 @@ void CGDriver::compute_u_v_from_wxy(const std::size_t mode,
 }  // compute_u_v_from_wxy
 
 void CGDriver::sort_and_add_matrix_elements(
-    const std::size_t& nrow,
-    const std::size_t& k,
+    const std::size_t nrow,
+    const std::size_t k,
     std::array<int, column_count + 10>& jcol,
     std::array<double, column_count + 10>& acol,
     double* csr_val,

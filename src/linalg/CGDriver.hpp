@@ -54,7 +54,7 @@ class CGDriver : public MathDriver {
    * @param output_vector - result vector (y vector)
    * @return nothing, output_vector contains result
    */
-  void compute_sparse_Ax_y(const std::size_t& n,
+  void compute_sparse_Ax_y(const std::size_t n,
                            double* acsr,
                            int* icsr,
                            int* jcsr,
@@ -67,7 +67,7 @@ class CGDriver : public MathDriver {
    * @param y - 2nd vector
    * @return scalar product
    */
-  double scalar_product(const std::size_t& n, double* x, double* y);
+  double scalar_product(const std::size_t n, double* x, double* y);
 
   /**
    *	solve linear equations system: CG - standard algorithm - Saad
@@ -81,7 +81,7 @@ class CGDriver : public MathDriver {
    * @param itmax
    * @param tol
    */
-  void apply_CG_standard(const std::size_t& row_count,
+  void apply_CG_standard(const std::size_t row_count,
                          double* csr_val,
                          int* csr_row,
                          int* csr_col,
@@ -142,8 +142,8 @@ class CGDriver : public MathDriver {
    *
    *
    */
-  void sort_and_add_matrix_elements(const std::size_t&,
-                                    const std::size_t&,
+  void sort_and_add_matrix_elements(const std::size_t,
+                                    const std::size_t,
                                     std::array<int, column_count + 10>&,
                                     std::array<double, column_count + 10>&,
                                     double*,
