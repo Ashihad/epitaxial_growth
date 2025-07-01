@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import argparse
 import logging
 import os
+import sys
 from pathlib import Path
 
 time_format = '%H:%M:%S'
@@ -18,7 +19,7 @@ def plot_grid(args):
   infile_name = "grid.dat"
   outfile_name = "atoms.png"
 
-  infile_path = args.input_dir / infile_name
+  infile_path = args.work_dir / infile_name
   logger.info(f"Reading from {infile_path}...")
   df = pd.read_csv(infile_path, header=1, names=('x', 'y', 'type', 'ep'), sep=r'\s+')
   logger.info("Reading done")
@@ -44,7 +45,7 @@ def plot_grid(args):
   ax.imshow(grid, origin='lower', cmap=cmap, norm=norm, interpolation=None, extent=(1, x_max+1, 1, y_max+1))
   logger.info(f"Generation done")
 
-  outfile_path = args.output_dir / outfile_name
+  outfile_path = args.work_dir / outfile_name
   logger.info(f"Saving grid plot at {outfile_path}...")
   plt.savefig(outfile_path)
   logger.info(f"Plot saved")
@@ -57,7 +58,7 @@ def plot_energies(args):
   infile_name = "grid.dat"
   outfile_name = "energies.png"
   
-  infile_path = args.input_dir / infile_name
+  infile_path = args.work_dir / infile_name
   logger.info(f"Reading from {infile_path}...")
   df = pd.read_csv(infile_path, header=1, names=('x', 'y', 'type', 'ep'), sep=r'\s+')
   logger.info("Reading done")
@@ -83,7 +84,7 @@ def plot_energies(args):
   plt.colorbar(im, cax=cax, ticks=np.floor(np.linspace(df['ep'].min(), df['ep'].max(), 3)*1000)/1000, label='Energy [$eV$]')
   logger.info(f"Generation done")
 
-  outfile_path = args.output_dir / outfile_name
+  outfile_path = args.work_dir / outfile_name
   logger.info(f"Saving energy plot at {outfile_path}...")
   plt.savefig(outfile_path)
   logger.info("Plot saved")
@@ -94,14 +95,14 @@ def plot_energies(args):
 
 def parse_args():
   parser = argparse.ArgumentParser()
-  parser.add_argument("-i", "--input_dir", type=Path, required=False, default="release")
-  parser.add_argument("-o", "--output_dir", type=Path, required=False, default=".")
+  parser.add_argument("-w", "--work_dir", type=Path, required=False, default="release")
   parser.add_argument("-q", "--quiet", action="store_true", help="Pass this flag to prevent program from showing interactive plots")
   return parser.parse_args()
 
 if __name__ == "__main__":
   args = parse_args()
-  if not (os.path.exists(args.output_dir) and os.path.isdir(args.output_dir)):
-    os.mkdir(args.output_dir)
+  if not (os.path.exists(args.work_dir) and os.path.isdir(args.work_dir)):
+    logger.critical(f"Invalid \"-w\" argument (argument is not a directory, got \"{args.work_dir}\")")
+    sys.exit(1)
   plot_grid(args)
   plot_energies(args)
