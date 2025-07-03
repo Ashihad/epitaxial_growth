@@ -20,11 +20,13 @@ class Simulator {
  public:
   Simulator(const ConfigPhysics&, const ConfigSimulation&, const ConfigCG&);
   void init_grid();
+  void add_island();
   void print_header();
   void print_iter_header();
   void perform_periodic_actions();
 
   double get_duv_max();
+  double fill_gradients();
 
   void run_loop();
 
@@ -61,6 +63,8 @@ class Simulator {
   const int m_diffusion_mode;
   const long unsigned m_dump_data_freq;
   const long unsigned m_global_relaxation_freq;
+
+  const bool m_island;
 
   // physics constants
   const double m_kbt;  // k_b * T / 1eV

@@ -36,6 +36,7 @@ Simulator::Simulator(const ConfigPhysics& conf_ph,
       m_diffusion_mode{conf_sim.diffusion_mode},
       m_dump_data_freq{conf_sim.dump_data_freq},
       m_global_relaxation_freq{conf_sim.global_relaxation_freq},
+      m_island{conf_sim.add_island},
       m_kbt{1.38E-23 * m_temperature / 1.602E-19},
       m_duv_max{},
       m_grid{},
@@ -64,6 +65,21 @@ void Simulator::init_grid() {
   for (auto& col : m_grid) {
     for (std::size_t j = m_substrate_height; j < m_substrate_height + 5; ++j) {
       col[j].type = ATOM_TYPE::ADATOM;  // 0-empty, 1-Si, 2-Ge
+    }
+  }
+  if (m_island)
+    add_island();
+}
+
+void Simulator::add_island() {
+  const std::size_t x_min{m_grid_x / 2 - 15};
+  const std::size_t x_max{m_grid_x / 2 + 15 + 1};
+  const std::size_t y_max{m_substrate_height - 2 + 1};
+  const std::size_t y_min{m_substrate_height - 12};
+
+  for (std::size_t i{x_min}; i < x_max; i++) {
+    for (std::size_t j{y_min}; j < y_max; j++) {
+      m_grid[i][j].type = ATOM_TYPE::ADATOM;
     }
   }
 }
@@ -140,6 +156,9 @@ void Simulator::perform_periodic_actions() {
     }
     x_pos++;
   }
+
+  // get dE/duv
+  fill_gradients();
 
   // dump data
   fHandler.save_grid(m_grid);
@@ -598,4 +617,49 @@ void Simulator::conduct_global_relaxation(bool performOnCopy) {
   const int ierr = 0;
   mathDriver->solve_linear_system(imin, i_nodes, jmin, jmax, ierr, &bmax,
                                   performOnCopy);
+}
+
+double Simulator::fill_gradients() {
+  double gradient_norm = 0;
+
+  for (std::size_t i = 0; i < m_grid_x; i++) {
+    for (size_t j = 1; j < (m_grid_y - 1); j++) {
+      if (m_grid[i][j].type != ATOM_TYPE::NO_ATOM) {
+        double u0 = m_grid[i][j].u;
+        double v0 = m_grid[i][j].v;
+        double delta = 0.01;  // krok do liczenia pochodnych
+
+        double epx, emx, epy, emy;
+
+        m_grid[i][j].u = u0 + delta;
+        epx = get_elastic_energy(i, j);
+
+        m_grid[i][j].u = u0 - delta;
+        emx = get_elastic_energy(i, j);
+
+        m_grid[i][j].u = u0;
+
+        m_grid[i][j].v = v0 + delta;
+        epy = get_elastic_energy(i, j);
+
+        m_grid[i][j].v = v0 - delta;
+        emy = get_elastic_energy(i, j);
+
+        m_grid[i][j].v = v0;
+
+        m_grid[i][j].grad_x = (epx - emx) / 2 / delta;  // pochodna w x
+        m_grid[i][j].grad_y = (epy - emy) / 2 / delta;  // pochodna w y
+
+        gradient_norm +=
+            std::pow(m_grid[i][j].grad_x, 2) + std::pow(m_grid[i][j].grad_y, 2);
+      } else {
+        m_grid[i][j].grad_x = 0.;
+        m_grid[i][j].grad_y = 0.;
+      }
+    }
+  }
+
+  gradient_norm = sqrt(gradient_norm);
+
+  return gradient_norm;
 }
