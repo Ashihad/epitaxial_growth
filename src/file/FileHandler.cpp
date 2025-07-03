@@ -100,23 +100,41 @@ void FileHandler::save_tmp(const Grid& grid) {
     throw std::runtime_error("Cannot open tmp file " + tmp_filename);
   }
   tmp_fd << std::scientific << std::setprecision(5);
+
+  // clang-format off
+  tmp_fd << "#      i"
+         << std::setw(8) << "j"
+         << std::setw(8) << "atom"
+         << std::setw(15) << "u"
+         << std::setw(15) << "v"
+         << std::setw(15) << "boundary1"
+         << std::setw(15) << "boundary2"
+         << std::setw(15) << "grad_x"
+         << std::setw(15) << "grad_y"
+         << std::setw(15) << "energy" 
+         << '\n';
+  // clang-format on
+
+  std::size_t x_pos = 0;
   for (const auto& col : grid) {
+    std::size_t y_pos = 0;
     for (const auto& atom : col) {
       // clang-format off
-      tmp_fd << std::setw(15)
-             << static_cast<int>(atom.type) << "  "
-             << atom.u << " "
-             << atom.v << " "
-             << atom.boundary1 << " "
-             << atom.boundary2 << " "
-             << atom.param_5 << " "
-             << atom.param_6 << " "
-             << atom.grad_x << " "
-             << atom.grad_y << " "
-             << atom.el_energy << " "
+      tmp_fd << std::setw(8) << x_pos
+             << std::setw(8) << y_pos
+             << std::setw(8) << static_cast<int>(atom.type)
+             << std::setw(15) << atom.u
+             << std::setw(15) << atom.v
+             << std::setw(15) << atom.boundary1
+             << std::setw(15) << atom.boundary2
+             << std::setw(15) << atom.grad_x
+             << std::setw(15) << atom.grad_y
+             << std::setw(15) << atom.el_energy
              << "\n";
       // clang-format on
+      y_pos++;
     }
+    x_pos++;
   }
   tmp_fd.close();
 }
