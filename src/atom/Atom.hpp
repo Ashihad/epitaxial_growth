@@ -12,8 +12,6 @@ struct Atom {
         v{},
         boundary1{},
         boundary2{},
-        param_5{},
-        param_6{},
         grad_x{},
         grad_y{},
         el_energy{} {};
@@ -23,8 +21,6 @@ struct Atom {
         v{},
         boundary1{},
         boundary2{},
-        param_5{},
-        param_6{},
         grad_x{},
         grad_y{},
         el_energy{} {}
@@ -33,8 +29,6 @@ struct Atom {
   double v;             // param 2
   int boundary1;        // param 3
   int boundary2;        // param 4
-  double param_5;
-  double param_6;
   double grad_x;
   double grad_y;
   double el_energy;
