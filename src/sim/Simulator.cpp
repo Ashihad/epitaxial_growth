@@ -12,7 +12,7 @@
 
 Simulator::Simulator(const ConfigPhysics& conf_ph,
                      const ConfigSimulation& conf_sim,
-                     const ConfigCG& conf_cg)
+                     const ConfigMathDriver& conf_cg)
     : m_substrate_lattice_constant{conf_ph.substrate_lattice_constant},
       m_adatom_lattice_constant{conf_ph.adatom_lattice_constant},
       m_vertical_lat_spacing{conf_ph.vertical_lat_spacing},
@@ -42,7 +42,7 @@ Simulator::Simulator(const ConfigPhysics& conf_ph,
       m_grid{},
       m_grid_copy{},
       m_atoms_diff{},
-      mathDriver{new CGDriver(this, conf_cg, conf_ph)},
+      mathDriver{new CGDriver(conf_cg, conf_ph)},
       rngDriver{m_grid_x, m_diffusion_range},
       fHandler{} {
   init_grid();
@@ -592,8 +592,9 @@ void Simulator::conduct_local_relaxation(const std::size_t x_pos,
   // roznica: imin->imax
   const std::size_t i_nodes = 2 * m_local_relaxation_range_min;
   const int ierr = 0;
-  mathDriver->solve_linear_system(imin, i_nodes, jmin, jmax, ierr, &bmax,
-                                  performOnCopy);
+  Grid& chosen_grid = performOnCopy ? m_grid_copy : m_grid;
+  mathDriver->compute_displacements(chosen_grid, imin, i_nodes, jmin, jmax,
+                                    ierr, &bmax);
 
   // wartosc bledu lokalnego
   double mu = (m_adatom_lattice_constant - m_substrate_lattice_constant) /
@@ -615,8 +616,9 @@ void Simulator::conduct_global_relaxation(bool performOnCopy) {
   const std::size_t jmax = m_grid_y - 2;
   const std::size_t i_nodes = m_grid_x - 1;
   const int ierr = 0;
-  mathDriver->solve_linear_system(imin, i_nodes, jmin, jmax, ierr, &bmax,
-                                  performOnCopy);
+  Grid& chosen_grid = performOnCopy ? m_grid_copy : m_grid;
+  mathDriver->compute_displacements(chosen_grid, imin, i_nodes, jmin, jmax,
+                                    ierr, &bmax);
 }
 
 double Simulator::calculate_dEduv() {

@@ -29,4 +29,6 @@ struct ConfigSimulation {
 
   // every dump_data_freq data is saved to files
   const long unsigned dump_data_freq{1000};
+
+  const bool add_island{true};
 };

@@ -9,7 +9,7 @@
 
 #include "Atom.hpp"
 #include "AtomContainers.hpp"
-#include "ConfigCG.hpp"
+#include "ConfigMathDriver.hpp"
 #include "ConfigPhysics.hpp"
 #include "ConfigSimulation.hpp"
 #include "FileHandler.hpp"
@@ -18,7 +18,9 @@
 
 class Simulator {
  public:
-  Simulator(const ConfigPhysics&, const ConfigSimulation&, const ConfigCG&);
+  Simulator(const ConfigPhysics&,
+            const ConfigSimulation&,
+            const ConfigMathDriver&);
   void init_grid();
   void add_island();
   void print_header();
