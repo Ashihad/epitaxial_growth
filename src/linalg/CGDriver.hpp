@@ -23,10 +23,7 @@ class CGDriver : public MathDriver {
    * @param itmax
    * @param tol
    */
-  void solve_linear_system(const std::size_t row_count,
-                           double* csr_val,
-                           int* csr_row,
-                           int* csr_col,
-                           double* b,
-                           double* x) override;
+  void solve_linear_system(CSRMatrix& A,
+                           FastVector<double>& b,
+                           FastVector<double>& x) override;
 };

@@ -4,6 +4,7 @@
 #include <cstdlib>
 
 #include "AtomContainers.hpp"
+#include "CSRContainers.hpp"
 #include "ConfigMathDriver.hpp"
 #include "ConfigPhysics.hpp"
 #include "MatrixTypes.hpp"
@@ -47,12 +48,9 @@ class MathDriver {
   double m_last_tolerance;
 
   // must be defined in child
-  virtual void solve_linear_system(const std::size_t row_count,
-                                   double* csr_val,
-                                   int* csr_row,
-                                   int* csr_col,
-                                   double* b,
-                                   double* x) = 0;
+  virtual void solve_linear_system(CSRMatrix& A,
+                                   FastVector<double>& b,
+                                   FastVector<double>& x) = 0;
 
   /**
    * Compute Ax=y where A is given in CSR format
@@ -68,12 +66,9 @@ class MathDriver {
    * @param output_vector - result vector (y vector)
    * @return nothing, output_vector contains result
    */
-  void compute_sparse_Ax_y(const std::size_t n,
-                           double* acsr,
-                           int* icsr,
-                           int* jcsr,
-                           double* x,
-                           double* y);
+  void matrix_times_vector(const CSRMatrix& A,
+                           const FastVector<double>& x,
+                           FastVector<double>& y);
 
   /**
    * Compute inner product of two vectors x and y, each of them of length n
@@ -81,7 +76,7 @@ class MathDriver {
    * @param y - 2nd vector
    * @return scalar product
    */
-  double scalar_product(const std::size_t n, double* x, double* y);
+  double dot(const FastVector<double>& x, const FastVector<double>& y);
 
   /**
    * liczymy wkladu do wiersza dla wyrazu wxx/wyy - identycznie
@@ -102,7 +97,7 @@ class MathDriver {
                             const Grid& crystal,
                             std::array<double, column_count + 10>& acol,
                             std::array<int, column_count + 10>& jcol,
-                            double* ff);
+                            FastVector<double>& ff);
 
   /**
    *  liczymy wkladu do wiersza od wxy
@@ -124,7 +119,7 @@ class MathDriver {
                             const Grid& crystal,
                             std::array<double, column_count + 10>& acol,
                             std::array<int, column_count + 10>& jcol,
-                            double* ff);
+                            FastVector<double>& ff);
 
   /**
    *
@@ -138,10 +133,7 @@ class MathDriver {
    *
    */
   void sort_and_add_matrix_elements(const std::size_t,
-                                    const std::size_t,
                                     std::array<int, column_count + 10>&,
                                     std::array<double, column_count + 10>&,
-                                    double*,
-                                    int*,
-                                    int*);
+                                    CSRMatrix& A);
 };

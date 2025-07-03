@@ -32,6 +32,7 @@ void MathDriver::compute_displacements(Grid& grid,
                                        double* bmax) {
   const std::size_t grid_x = grid.size();
   const std::size_t grid_y = grid[0].size();
+
   // check boundaries to prevent out-of-memory access
   if (jmin < 1 || jmax > grid_y - 2) {
     jmin = std::max(jmin, 1ul);
@@ -96,15 +97,12 @@ void MathDriver::compute_displacements(Grid& grid,
 
   // maksymalna liczba niezerowych elementow w wierszu * liczba wierszy
   const std::size_t nmax = row_count * 9 * 2;
-  std::unique_ptr<double[]> csr_val{new double[nmax]};
-  std::unique_ptr<int[]> icsr{new int[row_count + 1]};
-  // aktualna liczba elementów niezerowych w macierzy ukladu
-  icsr[row_count] = 0;
-  std::unique_ptr<int[]> jcsr{new int[nmax]};
+  CSRMatrix A(nmax, row_count);
+  A.row_index[A.n_rows] = 0;
 
-  std::unique_ptr<double[]> ff{new double[row_count]};
-  std::unique_ptr<double[]> xx{new double[row_count]};
-  std::unique_ptr<double[]> bb{new double[row_count]};
+  FastVector<double> ff(row_count);
+  FastVector<double> xx(row_count);
+  FastVector<double> bb(row_count);
 
   /**
    * tworzymy tablice lokalnego otoczenia punktu 3x3
@@ -160,11 +158,11 @@ void MathDriver::compute_displacements(Grid& grid,
         int id = static_cast<int>(grid[i_central][j_central].type) *
                  static_cast<int>(grid[i3][j3].type);
         if (id == 1) {
-          // s-s
+          // subst-subst
           d1_matrix[i][j] = 0;
           d2_matrix[i][j] = 0;
         } else if (id == 2 || id == 4) {
-          // g-g (4) or g-s (2)
+          // ad-ad (4) or ad-subst (2)
           d1_matrix[i][j] =
               m_adatom_lattice_constant - m_substrate_lattice_constant;
           d2_matrix[i][j] = m_adatom_lattice_constant - m_vertical_lat_spacing;
@@ -186,29 +184,27 @@ void MathDriver::compute_displacements(Grid& grid,
     // iteracji
     ff[k] = 0.;
     std::fill(acol.begin(), acol.end(), 0.0);
-    std::fill(jcol.begin(), jcol.end(), 0.0);
+    std::fill(jcol.begin(), jcol.end(), 0);
 
     if (number == 3) {
       compute_u_v_from_wxx(number, k, i_central, j_central, grid_x, ip,
-                           iboundary, d1_matrix, grid, acol, jcol, ff.get());
+                           iboundary, d1_matrix, grid, acol, jcol, ff);
       compute_u_v_from_wxy(number, k, i_central, j_central, grid_x, ip,
-                           iboundary, d2_matrix, grid, acol, jcol, ff.get());
+                           iboundary, d2_matrix, grid, acol, jcol, ff);
     } else if (number == 4) {
       compute_u_v_from_wxx(number, k, i_central, j_central, grid_x, ip,
-                           iboundary, d2_matrix, grid, acol, jcol, ff.get());
+                           iboundary, d2_matrix, grid, acol, jcol, ff);
       compute_u_v_from_wxy(number, k, i_central, j_central, grid_x, ip,
-                           iboundary, d1_matrix, grid, acol, jcol, ff.get());
+                           iboundary, d1_matrix, grid, acol, jcol, ff);
     }
-    sort_and_add_matrix_elements(row_count, k, jcol, acol, csr_val.get(),
-                                 icsr.get(), jcsr.get());
+    sort_and_add_matrix_elements(k, jcol, acol, A);
   }  // k=row index
 
   // rozwiazujemy uklad rownan A*(uv)=ff
   // Conjugate Gradients
   std::size_t itmax0 = m_max_iterations;
 
-  for (std::size_t i = 0; i < row_count; i++)
-    xx[i] = 0.0;
+  std::fill_n(xx.get(), row_count, 0.0);
 
   // wektor startowy to poprzednie rozwiazanie
   for (std::size_t k = 0; k < row_count; k++) {  // numer wiersza globalnego
@@ -229,8 +225,7 @@ void MathDriver::compute_displacements(Grid& grid,
   if (ierr == 0) {
     // rozwiazujemy uklad rownan
 
-    solve_linear_system(row_count, csr_val.get(), icsr.get(), jcsr.get(),
-                        ff.get(), xx.get());
+    solve_linear_system(A, ff, xx);
 
     if (m_last_tolerance >= 1.0E-3 || m_last_iterations_no >= itmax0) {
       printf("solution:  iterations,  tolerance  =   %6ld   %15.5E  \n\n",
@@ -250,9 +245,8 @@ void MathDriver::compute_displacements(Grid& grid,
   }
 
   // norma max z wektora reszt - liczymy zawsze: ierr-dowolne
-  compute_sparse_Ax_y(row_count, csr_val.get(), icsr.get(), jcsr.get(),
-                      xx.get(),
-                      bb.get());  // bb = csr_val*xx
+  matrix_times_vector(A, xx,
+                      bb);  // bb = csr_val*xx
   *bmax = 0.;
   for (std::size_t i = 0; i < row_count; i++) {
     bb[i] = bb[i] - ff[i];
@@ -261,28 +255,25 @@ void MathDriver::compute_displacements(Grid& grid,
   }
 }  // solve Au=F:end
 
-void MathDriver::compute_sparse_Ax_y(const std::size_t n_rows,
-                                     double* csr_val,
-                                     int* csr_row,
-                                     int* csr_column,
-                                     double* input_vector,
-                                     double* output_vector) {
+void MathDriver::matrix_times_vector(const CSRMatrix& A,
+                                     const FastVector<double>& input,
+                                     FastVector<double>& output) {
   // iterate over rows
-  for (std::size_t i = 0; i < n_rows; i++) {
+  for (std::size_t i = 0; i < A.n_rows; i++) {
     double sum = 0;
-    int col;
-    for (int j = csr_row[i]; j <= csr_row[i + 1] - 1; j++) {
-      col = csr_column[j];
-      sum += csr_val[j] * input_vector[col];
+    for (std::size_t j = A.row_index[i]; j <= A.row_index[i + 1] - 1; j++) {
+      const std::size_t col = A.col_index[j];
+      sum += A.value[j] * input[col];
     }
-    output_vector[i] = sum;
+    output[i] = sum;
   }
   return;
 }
 
-double MathDriver::scalar_product(const std::size_t n, double* x, double* y) {
+double MathDriver::dot(const FastVector<double>& x,
+                       const FastVector<double>& y) {
   double res = 0.;
-  for (std::size_t i = 0; i < n; i++) {
+  for (std::size_t i = 0; i < x.size; i++) {
     res += x[i] * y[i];
   }
   return res;
@@ -300,7 +291,7 @@ void MathDriver::compute_u_v_from_wxx(
     const Grid& grid,
     std::array<double, column_count + 10>& acol,
     std::array<int, column_count + 10>& jcol,
-    double* ff) {
+    FastVector<double>& ff) {
   // matrix central i index
   std::size_t ii = 1;
   // matrix central j index
@@ -317,11 +308,10 @@ void MathDriver::compute_u_v_from_wxx(
           m_spring_const_next_neighbors / 2. * ip[ii][jj] * ip[ii - 1][jj + 1];
     val = val * (-1);  // pochodna wewnetrzna
 
-    std::size_t lu = static_cast<std::size_t>(jcol[0] + 1);
-    jcol[0] = static_cast<int>(lu);
-    jcol[lu] =
-        static_cast<int>(std::lround(grid[i_central][j_central].boundary1));
-    acol[lu] = val;
+    int lu = jcol[0] + 1;
+    jcol[0] = lu;
+    jcol[static_cast<std::size_t>(lu)] = grid[i_central][j_central].boundary1;
+    acol[static_cast<std::size_t>(lu)] = val;
 
     // element wolny - wxx
     val = m_spring_const_neighbors * ip[ii][jj] * ip[ii + 1][jj] *
@@ -350,10 +340,10 @@ void MathDriver::compute_u_v_from_wxx(
           m_spring_const_next_neighbors / 2. * ip[ii][jj] * ip[ii + 1][jj - 1] -
           m_spring_const_next_neighbors / 2. * ip[ii][jj] * ip[ii - 1][jj + 1];
     val = val * (-1);  // pochodna wewnetrzna
-    std::size_t lu = static_cast<std::size_t>(jcol[0] + 1);
-    jcol[0] = static_cast<int>(lu);
-    jcol[lu] = static_cast<int>(lround(grid[i_central][j_central].boundary2));
-    acol[lu] = val;
+    int lu = jcol[0] + 1;
+    jcol[0] = lu;
+    jcol[static_cast<std::size_t>(lu)] = grid[i_central][j_central].boundary2;
+    acol[static_cast<std::size_t>(lu)] = val;
 
     // element wolny - wyy
     val = m_spring_const_neighbors * ip[ii][jj] * ip[ii][jj + 1] *
@@ -478,7 +468,7 @@ void MathDriver::compute_u_v_from_wxy(
     const Grid& crystal,
     std::array<double, column_count + 10>& acol,
     std::array<int, column_count + 10>& jcol,
-    double* ff) {
+    FastVector<double>& ff) {
   std::size_t ii = 1;
   std::size_t jj = 1;
   double wsp = 2.0;  // mnoznik dla wxy w wij
@@ -510,11 +500,10 @@ void MathDriver::compute_u_v_from_wxy(
         lu = static_cast<std::size_t>(jcol[0] + 1);
         jcol[0] = static_cast<int>(lu);
         if (number == 3)
-          jcol[lu] = static_cast<int>(
-              lround(crystal[i3][static_cast<std::size_t>(
+          jcol[lu] = crystal[i3][static_cast<std::size_t>(
                                      static_cast<int>(j_central) + jm)]
-                         .boundary1));  // oddzialywanie:
-                                        // u->v, v->u
+                         .boundary1;  // oddzialywanie:
+                                      // u->v, v->u
         else if (number == 4)
           jcol[lu] = static_cast<int>(
               lround(crystal[i3][static_cast<std::size_t>(
@@ -583,14 +572,12 @@ void MathDriver::compute_u_v_from_wxy(
 }  // compute_u_v_from_wxy
 
 void MathDriver::sort_and_add_matrix_elements(
-    const std::size_t nrow,
     const std::size_t k,
     std::array<int, column_count + 10>& jcol,
     std::array<double, column_count + 10>& acol,
-    double* csr_val,
-    int* icsr,
-    int* jcsr) {
+    CSRMatrix& A) {
   // sorting, double bubble sort
+
   // number of non-zero elements in row
   std::size_t l = static_cast<std::size_t>(jcol[0]);
   for (std::size_t i = 1; i < l; i++) {
@@ -607,19 +594,19 @@ void MathDriver::sort_and_add_matrix_elements(
     std::exit(1);
   }
 
-  // dodajemy elementy do macierzy: csr_val, jcsr, icsr
+  // dodajemy elementy do macierzy A
 
   // aktualna liczba elementow niezerowych - indeksowane od 0,
-  int nnz = icsr[nrow];
+  std::size_t nnz = A.row_index[A.n_rows];
   // pozycja nnz jest pusta - od niej zaczynamy wypelnianie
   // wiersza k-tego
-  icsr[k] = nnz;
+  A.row_index[k] = nnz;
   for (std::size_t i = 1; i <= l; i++) {
-    csr_val[nnz] = acol[i];
-    jcsr[nnz] = jcol[i];
+    A.value[nnz] = acol[i];
+    A.col_index[nnz] = static_cast<std::size_t>(jcol[i]);
     nnz++;
   }
-  icsr[nrow] = nnz;  // zachowujemy aktualna wartosc nnz
+  A.row_index[A.n_rows] = nnz;  // zachowujemy aktualna wartosc nnz
 
   return;
 }  // sort_and_add
