@@ -158,7 +158,7 @@ void Simulator::perform_periodic_actions() {
   }
 
   // get dE/duv
-  fill_gradients();
+  calculate_dEduv();
 
   // dump data
   fHandler.save_grid(m_grid);
@@ -619,7 +619,7 @@ void Simulator::conduct_global_relaxation(bool performOnCopy) {
                                   performOnCopy);
 }
 
-double Simulator::fill_gradients() {
+double Simulator::calculate_dEduv() {
   double gradient_norm = 0;
 
   for (std::size_t i = 0; i < m_grid_x; i++) {
@@ -629,21 +629,19 @@ double Simulator::fill_gradients() {
         double v0 = m_grid[i][j].v;
         double delta = 0.01;  // krok do liczenia pochodnych
 
-        double epx, emx, epy, emy;
-
         m_grid[i][j].u = u0 + delta;
-        epx = get_elastic_energy(i, j);
+        double epx = get_elastic_energy(i, j);
 
         m_grid[i][j].u = u0 - delta;
-        emx = get_elastic_energy(i, j);
+        double emx = get_elastic_energy(i, j);
 
         m_grid[i][j].u = u0;
 
         m_grid[i][j].v = v0 + delta;
-        epy = get_elastic_energy(i, j);
+        double epy = get_elastic_energy(i, j);
 
         m_grid[i][j].v = v0 - delta;
-        emy = get_elastic_energy(i, j);
+        double emy = get_elastic_energy(i, j);
 
         m_grid[i][j].v = v0;
 
@@ -659,7 +657,7 @@ double Simulator::fill_gradients() {
     }
   }
 
-  gradient_norm = sqrt(gradient_norm);
+  gradient_norm = std::sqrt(gradient_norm);
 
   return gradient_norm;
 }

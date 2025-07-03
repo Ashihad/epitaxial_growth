@@ -26,7 +26,7 @@ class Simulator {
   void perform_periodic_actions();
 
   double get_duv_max();
-  double fill_gradients();
+  double calculate_dEduv();
 
   void run_loop();
 
