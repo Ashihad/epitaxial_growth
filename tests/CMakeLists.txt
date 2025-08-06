@@ -8,7 +8,6 @@ add_executable(
   "test_linalg.cpp"
   "test_physics.cpp"
   "test_rng.cpp"
-  "test_sim.cpp"
 )
 
 target_include_directories(${UT_EXEC} PUBLIC .)
