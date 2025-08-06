@@ -9,7 +9,7 @@
 
 #include "Atom.hpp"
 #include "AtomContainers.hpp"
-#include "ConfigCG.hpp"
+#include "ConfigMathDriver.hpp"
 #include "ConfigPhysics.hpp"
 #include "ConfigSimulation.hpp"
 #include "FileHandler.hpp"
@@ -18,13 +18,18 @@
 
 class Simulator {
  public:
-  Simulator(const ConfigPhysics&, const ConfigSimulation&, const ConfigCG&);
+  Simulator(const ConfigPhysics&,
+            const ConfigSimulation&,
+            const ConfigMathDriver&);
+  virtual ~Simulator() = default;
   void init_grid();
+  void add_island();
   void print_header();
   void print_iter_header();
   void perform_periodic_actions();
 
   double get_duv_max();
+  double calculate_dEduv();
 
   void run_loop();
 
@@ -46,6 +51,7 @@ class Simulator {
   const std::size_t m_grid_x;
   const std::size_t m_grid_y;
   const std::size_t m_substrate_height;
+  const std::size_t m_initial_adatom_height;
 
   const std::size_t m_local_relaxation_range_min;
   const std::size_t m_local_relaxation_range_max;
@@ -62,6 +68,8 @@ class Simulator {
   const long unsigned m_dump_data_freq;
   const long unsigned m_global_relaxation_freq;
 
+  const bool m_island;
+
   // physics constants
   const double m_kbt;  // k_b * T / 1eV
 
@@ -69,7 +77,7 @@ class Simulator {
 
   Grid m_grid;
   Grid m_grid_copy;
-  DiffStructure m_atoms_diff;
+  DiffStructure m_atoms_diffused;
 
   // drivers
   std::unique_ptr<MathDriver> mathDriver;

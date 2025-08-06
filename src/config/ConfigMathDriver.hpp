@@ -1,0 +1,8 @@
+#pragma once
+
+struct ConfigMathDriver {
+  virtual ~ConfigMathDriver() = default;
+  /* Solver method specific parameters */
+  const long unsigned max_iterations{1000};
+  const double tolerance{1.0E-3};
+};

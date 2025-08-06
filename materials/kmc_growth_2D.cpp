@@ -21,6 +21,7 @@
 // #include<omp.h>
 
 // #include <Eigen/Sparse>
+// #define DEBUG
 
 using namespace std;
 
@@ -951,23 +952,18 @@ double compute_elastic_energy_wij(const int & i, const int & j, const vector<vec
  ***************************************************************************/
 #include <iomanip>
 double gen_uniform(){
+#ifdef DEBUG
   static unsigned fake_rand{};
   fake_rand = (1664525 * fake_rand + 1013904223) % (RAND_MAX * 2U + 1U);
-  // std::cout << "gen_uniform returns " << std::setprecision(20)
-  //           << static_cast<double>(fake_rand) /
-  //                  static_cast<double>(RAND_MAX * 2U + 1U)
-  //           << std::endl;
   return (static_cast<double>(fake_rand) / static_cast<double>(RAND_MAX * 2U + 1U));
-	// return ((double)rand()/RAND_MAX);
+#else
+	return ((double)rand()/RAND_MAX);
+#endif
 }
 
 
 int gen_discrete_1_K(const int & K){
   double uniform{gen_uniform()};
-  // std::cout << "gen_discrete_1_K returns "
-  //           << static_cast<int>(
-  //                  lround(floor(uniform * static_cast<double>(K)) + 1))
-  //           << '\n';
 	int k1=lround(floor(uniform*K)+1);	
 	return k1;
 }
@@ -981,8 +977,6 @@ int gen_sign(){
 int gen_discrete_1_K_multiply_sign( const int & K){
   int discrete{gen_discrete_1_K(K)};
   int sign{gen_sign()};
-  // std::cout << "gen_discrete_1_K_sign returns "
-  //           << static_cast<int>(discrete) * sign << '\n';
 	return discrete*sign;
 }
 

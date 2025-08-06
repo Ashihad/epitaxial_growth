@@ -1,6 +1,7 @@
 #include "Simulator.hpp"
 
 #include "CGDriver.hpp"
+#include "GSDriver.hpp"
 #include "MatrixTypes.hpp"
 
 #include <cmath>
@@ -12,7 +13,7 @@
 
 Simulator::Simulator(const ConfigPhysics& conf_ph,
                      const ConfigSimulation& conf_sim,
-                     const ConfigCG& conf_cg)
+                     const ConfigMathDriver& conf_cg)
     : m_substrate_lattice_constant{conf_ph.substrate_lattice_constant},
       m_adatom_lattice_constant{conf_ph.adatom_lattice_constant},
       m_vertical_lat_spacing{conf_ph.vertical_lat_spacing},
@@ -25,6 +26,7 @@ Simulator::Simulator(const ConfigPhysics& conf_ph,
       m_grid_x{conf_sim.grid_x},
       m_grid_y{conf_sim.grid_y},
       m_substrate_height{conf_sim.substrate_height},
+      m_initial_adatom_height{conf_sim.initial_adatom_height},
       m_local_relaxation_range_min{conf_sim.local_relaxation_range_min},
       m_local_relaxation_range_max{conf_sim.local_relaxation_range_max},
       m_local_relaxation_tolerance{conf_sim.local_relaxation_tolerance},
@@ -36,12 +38,13 @@ Simulator::Simulator(const ConfigPhysics& conf_ph,
       m_diffusion_mode{conf_sim.diffusion_mode},
       m_dump_data_freq{conf_sim.dump_data_freq},
       m_global_relaxation_freq{conf_sim.global_relaxation_freq},
+      m_island{conf_sim.add_island},
       m_kbt{1.38E-23 * m_temperature / 1.602E-19},
       m_duv_max{},
       m_grid{},
       m_grid_copy{},
-      m_atoms_diff{},
-      mathDriver{new CGDriver(this, conf_cg, conf_ph)},
+      m_atoms_diffused{},
+      mathDriver{new CGDriver(conf_cg, conf_ph)},
       rngDriver{m_grid_x, m_diffusion_range},
       fHandler{} {
   init_grid();
@@ -51,7 +54,8 @@ void Simulator::init_grid() {
   // dimensionality: (m_grid_x, m_grid_y, n_values)
   m_grid.resize(m_grid_x, std::vector<Atom>(m_grid_y, Atom()));
   m_grid_copy.resize(m_grid_x, std::vector<Atom>(m_grid_y, Atom()));
-  m_atoms_diff.resize(m_grid_x + 1);
+  // deposition probability + no of atoms*diffusion probability
+  m_atoms_diffused.resize(m_grid_x + 1);
 
   // setting up substrate atoms up to m_substrate_height
   for (auto& col : m_grid) {
@@ -60,10 +64,26 @@ void Simulator::init_grid() {
     }
   }
 
-  // setting up four monolayers of adatoms
+  // setting up five monolayers of adatoms
   for (auto& col : m_grid) {
-    for (std::size_t j = m_substrate_height; j < m_substrate_height + 4; ++j) {
+    for (std::size_t j = m_substrate_height;
+         j < m_substrate_height + m_initial_adatom_height; ++j) {
       col[j].type = ATOM_TYPE::ADATOM;  // 0-empty, 1-Si, 2-Ge
+    }
+  }
+  if (m_island)
+    add_island();
+}
+
+void Simulator::add_island() {
+  const std::size_t x_min{m_grid_x / 2 - 15 - 40};
+  const std::size_t x_max{m_grid_x / 2 + 15 + 1 - 40};
+  const std::size_t y_max{m_substrate_height - 2 + 1};
+  const std::size_t y_min{m_substrate_height - 12};
+
+  for (std::size_t i{x_min}; i < x_max; i++) {
+    for (std::size_t j{y_min}; j < y_max; j++) {
+      m_grid[i][j].type = ATOM_TYPE::ADATOM;
     }
   }
 }
@@ -133,13 +153,18 @@ double Simulator::get_duv_max() {
 
 void Simulator::perform_periodic_actions() {
   // calculate elastic energy for each atom
+  std::size_t x_pos{};
   for (auto& col : m_grid) {
-    std::size_t x_pos = 0;
-    for (std::size_t y_pos = 1; y_pos < m_grid_y - 1; ++y_pos) {
-      col[y_pos].el_energy = get_elastic_energy(x_pos, y_pos);
+    std::size_t y_pos{};
+    for (auto& atom : col) {
+      atom.el_energy = get_elastic_energy(x_pos, y_pos);
+      y_pos++;
     }
     x_pos++;
   }
+
+  // get dE/duv
+  calculate_dEduv();
 
   // dump data
   fHandler.save_grid(m_grid);
@@ -150,9 +175,6 @@ void Simulator::perform_periodic_actions() {
 }
 
 void Simulator::run_loop() {
-  // tablice z polozeniami atomow - polozenie (x,y)
-  // odleglosci atomowe zrenormalizowane - oddzialywania/naprezenia skalowane
-  // wzgledem typu atomow
   srand(0);
 
   print_header();
@@ -163,6 +185,7 @@ void Simulator::run_loop() {
   long unsigned proposed_diffusions = 1;
   long unsigned accepted_diffusions = 1;
 
+  // timers
   double sim_time_passed{};
   long unsigned sim_iter{};
   auto start_time = std::chrono::high_resolution_clock::now();
@@ -200,27 +223,28 @@ void Simulator::run_loop() {
     double r_deposition = (static_cast<double>(m_diffusion_range) + 1.0) *
                           (2 * static_cast<double>(m_diffusion_range) + 1.0) *
                           fluence / 6.;
-    m_atoms_diff[0].r_diff = r_deposition;  // tempo depozycji atomow z wiazki
-    m_atoms_diff[0].r_diff_copy = r_deposition;
 
-    // szukamy atomow powierzchniowych podlegajacych dyfuzji -> tworzymy
-    // liste, z ktorej wybierzemy jeden lub depozycje idiffusion=1,2: 1-atomy
-    // podloza i zdeponowane, 2-tylko zdeponowane
+    // m_atoms_diffused[0] holds information about deposition probability, next
+    // elements holds probabilities for diffusion of specific atoms
+    m_atoms_diffused[0].r_diff = r_deposition;
+    m_atoms_diffused[0].r_diff_copy = r_deposition;
 
-    // liczba atomow powierzchniowych podlegajacych dyfuzji
+    // calculate how many atoms can be diffused
     std::size_t n_at_diff = 0;
     for (std::size_t i = 0; i < m_grid_x; i++) {
       // search for first existing atom, top to bottom
       for (std::size_t j = m_grid_y - 2; j >= 1; j--) {
         enum ATOM_TYPE curr_atom_type = m_grid[i][j].type;
         if (curr_atom_type != ATOM_TYPE::NO_ATOM) {
+          // is this atom type diffundable by the simulator config?
           if (static_cast<int>(curr_atom_type) >= m_diffusion_mode) {
             n_at_diff++;
-            m_atoms_diff[n_at_diff].type = curr_atom_type;  // typ atomu
-            m_atoms_diff[n_at_diff].idx = i;                // polozenie x
-            m_atoms_diff[n_at_diff].idy = j;                // polozenie y
+            m_atoms_diffused[n_at_diff].type = curr_atom_type;
+            m_atoms_diffused[n_at_diff].idx = i;
+            m_atoms_diffused[n_at_diff].idy = j;
 
-            unsigned neighbors_total = 0;  // nearest + next nearest
+            // calculate number of neighbors (nearest + next nearest)
+            unsigned neighbors_total = 0;
             for (int i_neigh = -1; i_neigh <= 1; i_neigh++) {
               for (int j_neigh = -1; j_neigh <= 1; j_neigh++) {
                 if ((std::abs(i_neigh) + std::abs(j_neigh)) > 0) {
@@ -235,16 +259,18 @@ void Simulator::run_loop() {
                 }
               }
             }
-            m_atoms_diff[n_at_diff].neighbors = neighbors_total;
-            m_atoms_diff[n_at_diff].neighbors_copy = neighbors_total;
+            m_atoms_diffused[n_at_diff].neighbors = neighbors_total;
+            m_atoms_diffused[n_at_diff].neighbors_copy = neighbors_total;
 
             double ep = get_elastic_energy(i, j);
-            m_atoms_diff[n_at_diff].el_energy = ep;
+            m_atoms_diffused[n_at_diff].el_energy = ep;
 
             double r0 = 12. * m_D /
                         (static_cast<double>(m_diffusion_range) + 1.0) /
                         (2 * static_cast<double>(m_diffusion_range) + 2.);
-            double delta_w = ep;  // for neighbors_total <= 2
+
+            // change effective energy based on no of neighbors
+            double delta_w = ep;
             if (neighbors_total == 3) {
               delta_w = ep * 1.5;
             } else if (neighbors_total == 4) {
@@ -253,106 +279,86 @@ void Simulator::run_loop() {
               delta_w = ep * 3.5;
             }
 
-            // szacowane tempo dyfuzji atomu
+            // diffusion rate of current atom
             double ri =
                 r0 *
                 std::exp((-m_bond_energy * neighbors_total + delta_w + m_E) /
                          m_kbt);
 
-            m_atoms_diff[n_at_diff].r_diff = ri;
-            m_atoms_diff[n_at_diff].r_diff_copy = ri;
+            m_atoms_diffused[n_at_diff].r_diff = ri;
+            m_atoms_diffused[n_at_diff].r_diff_copy = ri;
 
-            m_atoms_diff[n_at_diff].delta_w = delta_w;
+            m_atoms_diffused[n_at_diff].delta_w = delta_w;
           }
-          break;  // przerywamy sprawdzanie - natrafilismy na atom idac od
-                  // gory
+          break;
         }
       }
     }
 
-    // krok czasowy -> zmiana czasu [odwrotnosc aktualnej sumy czestosci
-    // procesow dt=1/sum_{i}(Gamma_i)] (dt deleted, now time gets incremented
-    // by 1.0/sum_ri instead of dt)
+    // increment time
     double sum_ri = 0;
     for (std::size_t i = 0; i <= n_at_diff; i++) {
-      sum_ri += m_atoms_diff[i].r_diff;
+      sum_ri += m_atoms_diffused[i].r_diff;
     }
     sim_time_passed += 1. / sum_ri;
 
-    // losujemy proces: depozycja lub dyfuzja atomu
+    // calculate probability array for diffusions
     for (std::size_t i = 1; i <= n_at_diff; i++) {
-      // suma Gamma_i do generatora dyskretnego
-      m_atoms_diff[i].r_diff += m_atoms_diff[i - 1].r_diff;
+      m_atoms_diffused[i].r_diff += m_atoms_diffused[i - 1].r_diff;
     }
 
-    double u1 = LegacyRNG::gen_uniform() * sum_ri;
-    // zabezpieczenie na wypadek gdyby petla nie zadziala
+    // choose a random process
+    double u1 = rngDriver.gen_uniform() * sum_ri;
     std::size_t chosen_action = n_at_diff;
     for (std::size_t i = 0; i <= n_at_diff; i++) {
-      if (u1 <= m_atoms_diff[i].r_diff) {
+      if (u1 <= m_atoms_diffused[i].r_diff) {
         chosen_action = i;
         break;
       }
     }
 
+    // chosen process - deposition
     if (chosen_action == 0) {
-      /***************************************************************************************************
-       * 			   chosen_action=0:  	losowa depozycja atomu
-       *
-       ***************************************************************************************************/
-
-      // zwiekszamy liczbe atomow w ukladzie
       added_atoms_count++;
 
-      // polozenie atomu w kierunku x: 0-(nx-1)
-      std::size_t ipos =
-          static_cast<std::size_t>(LegacyRNG::gen_discrete_1_K(m_grid_x)) - 1;
-      std::size_t jpos = 0;
+      // get random x coordinate
+      std::size_t i_added = rngDriver.gen_discrete_1_grid_x() - 1;
 
-      for (std::size_t j = m_grid_y - 1; j >= 1; j--) {
-        if (m_grid[ipos][j].type != ATOM_TYPE::NO_ATOM) {
-          jpos = j + 1;
-          if (jpos < m_grid_y) {
-            m_grid[ipos][jpos].type = ATOM_TYPE::ADATOM;
-            m_grid[ipos][jpos].u = 0.;
-            m_grid[ipos][jpos].v = 0.;
-            break;
-          } else {
-            std::cerr << "Too many atoms in system: jpos=" << jpos
-                      << ", grid_y=" << m_grid_y << "\n";
-            std::cerr << "Omitting point in i = " << ipos << '\n';
-            break;
-          }
-        }
+      // prevent atoms from overflowing upwards from grid
+      if (m_grid[i_added][m_grid_y - 1].type != ATOM_TYPE::NO_ATOM) {
+        std::cerr << "Too many atoms in system, omitting point in i = "
+                  << i_added << '\n';
       }
 
-      conduct_local_relaxation(ipos, jpos);
+      // get y coordinate of added atom by scanning for nearest atom in chosen x
+      // coordinate, top to down, add adatom one y upward than found
+      std::size_t j_added = 0;
+      std::size_t j{m_grid_y - 2};
+      while (j != 0) {
+        if (m_grid[i_added][j].type != ATOM_TYPE::NO_ATOM) {
+          j_added = j + 1;
+          m_grid[i_added][j_added].type = ATOM_TYPE::ADATOM;
+          m_grid[i_added][j_added].u = 0.;
+          m_grid[i_added][j_added].v = 0.;
+          break;
+        }
+        j--;
+      }
 
-    }  // chosen_action==0: depozycja atomu
+      conduct_local_relaxation(i_added, j_added);
+    }
+
+    // chosen process - diffusion
     else {
-      /****************************************************************************************************
-       * 				chosen_action>0: dyfuzja losowego atomu
-       *
-       ****************************************************************************************************/
-      // losowe przesuniecie lewo-prawo
-      int ii_shift =
-          LegacyRNG::gen_discrete_1_K_multiply_sign(m_diffusion_range);
-      // aktualna pozycja atomu dyfundujacego
-      std::size_t i_old = m_atoms_diff[chosen_action].idx;
-      std::size_t j_old = m_atoms_diff[chosen_action].idy;
-      // nowa pozycja atomu
-      std::size_t i_new =
-          (static_cast<std::size_t>(static_cast<int>(i_old) + ii_shift) +
-           m_grid_x) %
-          (m_grid_x);
-      std::size_t j_new;
+      std::size_t i_old = m_atoms_diffused[chosen_action].idx;
+      std::size_t j_old = m_atoms_diffused[chosen_action].idy;
 
-      int irange = 25;
-
-      // liczymy stara energie [-irange,irange]:  atom-on
+      // calculate energy with atom in, in range
+      // [i_old +/- local_en_range, j_old +/- local_en_range]
+      int local_en_range = 25;
       double en_old = 0.;
-      for (int i = -irange; i <= irange; i++) {
-        for (int j = -irange; j <= irange; j++) {
+      for (int i = -local_en_range; i <= local_en_range; i++) {
+        for (int j = -local_en_range; j <= local_en_range; j++) {
           std::size_t ii = static_cast<std::size_t>(
               (static_cast<int>(i_old) + i + static_cast<int>(m_grid_x)) %
               static_cast<int>(m_grid_x));
@@ -367,18 +373,19 @@ void Simulator::run_loop() {
         }
       }
 
-      // liczymy energie po usunieciu atomu (i_old,j_old): atom-off
-      m_grid_copy = m_grid;                                 // kopia: atom-on
-      m_grid_copy[i_old][j_old].type = ATOM_TYPE::NO_ATOM;  // atom gets deleted
+      // calculate energy w/out atom in range
+      // [i_old +/- local_en_range, j_old +/- local_en_range],
+      // use copy of grid for that
+      m_grid_copy = m_grid;
+      m_grid_copy[i_old][j_old].type = ATOM_TYPE::NO_ATOM;
 
-      // relaksacja naprezen w sieci atom-off
+      // recalculate displacements with no atom
       conduct_local_relaxation(i_old, j_old, true);
 
-      // liczymy nowa energie - atom-off
-      // [-range,irange]
+      // calculate energy with no atom, from copy of grid
       double en_new = 0.;
-      for (int i = -irange; i <= irange; i++) {
-        for (int j = -irange; j <= irange; j++) {
+      for (int i = -local_en_range; i <= local_en_range; i++) {
+        for (int j = -local_en_range; j <= local_en_range; j++) {
           int ii = static_cast<int>(
               (i_old + static_cast<std::size_t>(i) + m_grid_x) % m_grid_x);
           int jj = static_cast<int>(j_old + static_cast<std::size_t>(j));
@@ -395,23 +402,36 @@ void Simulator::run_loop() {
       // sprawdzamy czy prawdopodobienstwo r_new<r_old=r_approx - jesli
       // tak to atom dyfunduje
 
-      // current number of nearest neighbors
-      double neigh_d = std::round(m_atoms_diff[chosen_action].neighbors_copy);
+      // calculate probability of diffusion
+      unsigned int neigh_d = m_atoms_diffused[chosen_action].neighbors_copy;
       double r0 = 12. * m_D / (static_cast<double>(m_diffusion_range) + 1.0) /
                   (2 * static_cast<double>(m_diffusion_range) + 2.);
       double ri_new =
           r0 *
           std::exp((-m_bond_energy * neigh_d + (en_old - en_new) / 2 + m_E) /
                    m_kbt);  // exact atom diffusion rate
-      double ri_old = m_atoms_diff[chosen_action]
+      double ri_old = m_atoms_diffused[chosen_action]
                           .r_diff_copy;  // estimated diffusion probability
 
       proposed_diffusions++;
 
-      double random_uniform{LegacyRNG::gen_uniform()};
+      // calculate if diffusion is accepted based on rates calculated above
+      double random_uniform{rngDriver.gen_uniform()};
       double probability_border{ri_new / ri_old};
       if (random_uniform < (probability_border)) {
         accepted_diffusions++;
+
+        // generate random shift in x direction
+        int ii_shift = rngDriver.gen_discrete_plus_minus_diffusion_range();
+
+        // new position, mind the sign in x dimension
+        std::size_t i_new =
+            (static_cast<std::size_t>(static_cast<int>(i_old) + ii_shift) +
+             m_grid_x) %
+            (m_grid_x);
+        std::size_t j_new;
+
+        // m_grid = m_grid_copy;
 
         // atom type shall not change
         enum ATOM_TYPE atom_type_tmp = m_grid[i_old][j_old].type;
@@ -419,8 +439,8 @@ void Simulator::run_loop() {
         // delete atom in old position
         m_grid[i_old][j_old].type = ATOM_TYPE::NO_ATOM;
 
-        m_grid = m_grid_copy;
-        // osadzamy atom w j_new
+        // get new y coordinate of diffunded atom by scanning for nearest atom
+        // in chosen x coordinate, top to down, add atom one j up
         for (std::size_t j = m_grid_y - 1; j >= 1; j--) {
           if (m_grid[i_new][j].type != ATOM_TYPE::NO_ATOM) {
             if (j < (m_grid_y - 1)) {
@@ -434,12 +454,11 @@ void Simulator::run_loop() {
             }
           }
         }
-        // lokalna relaksacja polozen atomow w starym i w nowym polozeniu
+
+        // remember to recalculate displacements after moving atom
         conduct_local_relaxation(i_new, j_new);
       }
-
     }  // chosen_action: diffusion
-
   }  // main loop
 }
 
@@ -466,8 +485,8 @@ double Simulator::get_elastic_energy(const std::size_t x_pos,
       // retrieve offsets for crystal access
 
       // we iterate over (i-1, i, i+1), with wrapping
-      std::size_t i3 = (x_pos + i - 1 + m_grid_x) % (m_grid_x);
-      std::size_t j3 = y_pos + j - 1;
+      std::size_t i3 = (x_pos + m_grid_x + i - 1) % m_grid_x;
+      std::size_t j3 = (y_pos + m_grid_y + j - 1) % m_grid_y;
       if (chosen_grid[i3][j3].type != ATOM_TYPE::NO_ATOM)
         atom_mask[i][j] = 1;
       else
@@ -559,45 +578,82 @@ double Simulator::get_elastic_energy(const std::size_t x_pos,
 void Simulator::conduct_local_relaxation(const std::size_t x_pos,
                                          const std::size_t y_pos,
                                          bool performOnCopy) {
-  // NOTE: input/output combo
-  double bmax = 0;
-
   /*************************************************************************************
    * lokalna zmiana polozen atomow w otoczeniu irange_min - minimalizacja
    * naprezen nie ma sensu zwiekszac rozmiaru otoczenia i liczenia bledu bmax
    * wielokrotnie bo wyznaczenie Acsr trwa zawsze 2.5 ms
    *************************************************************************************/
   const std::size_t imin =
-      (x_pos - m_local_relaxation_range_min + m_grid_x) % m_grid_x;
+      (x_pos + m_grid_x - m_local_relaxation_range_min) % m_grid_x;
   const std::size_t jmin = std::max(y_pos - m_local_relaxation_range_min, 1ul);
   const std::size_t jmax =
       std::min(y_pos + m_local_relaxation_range_min, m_grid_y - 2ul);
   // roznica: imin->imax
   const std::size_t i_nodes = 2 * m_local_relaxation_range_min;
-  const int ierr = 0;
-  mathDriver->solve_linear_system(imin, i_nodes, jmin, jmax, ierr, &bmax,
-                                  performOnCopy);
+  Grid& chosen_grid = performOnCopy ? m_grid_copy : m_grid;
+
+  double biggest_abs_bi =
+      mathDriver->compute_displacements(chosen_grid, imin, i_nodes, jmin, jmax);
 
   // wartosc bledu lokalnego
   double mu = (m_adatom_lattice_constant - m_substrate_lattice_constant) /
               m_substrate_lattice_constant;
   // is tolerance so high that we need to do global relaxation?
-  double tol_local =
-      bmax / mu / m_substrate_lattice_constant / m_spring_const_neighbors;
+  double tol_local = biggest_abs_bi / mu / m_substrate_lattice_constant /
+                     m_spring_const_neighbors;
   if (tol_local > m_local_relaxation_tolerance) {
     conduct_global_relaxation(performOnCopy);
   }
 }
 
 void Simulator::conduct_global_relaxation(bool performOnCopy) {
-  // NOTE: input/output combo
-  double bmax = 0;
-  // is tolerance so high that we need to do global relaxation?
   const std::size_t imin = 0;
   const std::size_t jmin = 1;
   const std::size_t jmax = m_grid_y - 2;
-  const std::size_t i_nodes = m_grid_x - 1;
-  const int ierr = 0;
-  mathDriver->solve_linear_system(imin, i_nodes, jmin, jmax, ierr, &bmax,
-                                  performOnCopy);
+  const std::size_t imax = m_grid_x - 1;
+  Grid& chosen_grid = performOnCopy ? m_grid_copy : m_grid;
+  mathDriver->compute_displacements(chosen_grid, imin, imax, jmin, jmax);
+}
+
+double Simulator::calculate_dEduv() {
+  double gradient_norm = 0;
+
+  for (std::size_t i = 0; i < m_grid_x; i++) {
+    for (size_t j = 0; j < m_grid_y; j++) {
+      if (m_grid[i][j].type != ATOM_TYPE::NO_ATOM) {
+        double u_old = m_grid[i][j].u;
+        double v_old = m_grid[i][j].v;
+        double delta = 0.01;  // krok do liczenia pochodnych
+
+        m_grid[i][j].u = u_old + delta;
+        double epx = get_elastic_energy(i, j);
+
+        m_grid[i][j].u = u_old - delta;
+        double emx = get_elastic_energy(i, j);
+
+        m_grid[i][j].u = u_old;
+
+        m_grid[i][j].v = v_old + delta;
+        double epy = get_elastic_energy(i, j);
+
+        m_grid[i][j].v = v_old - delta;
+        double emy = get_elastic_energy(i, j);
+
+        m_grid[i][j].v = v_old;
+
+        m_grid[i][j].grad_x = (epx - emx) / 2 / delta;  // pochodna w x
+        m_grid[i][j].grad_y = (epy - emy) / 2 / delta;  // pochodna w y
+
+        gradient_norm +=
+            std::pow(m_grid[i][j].grad_x, 2) + std::pow(m_grid[i][j].grad_y, 2);
+      } else {
+        m_grid[i][j].grad_x = 0.;
+        m_grid[i][j].grad_y = 0.;
+      }
+    }
+  }
+
+  gradient_norm = std::sqrt(gradient_norm);
+
+  return gradient_norm;
 }
