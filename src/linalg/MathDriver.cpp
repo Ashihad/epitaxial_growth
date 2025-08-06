@@ -23,13 +23,11 @@ MathDriver::MathDriver(const ConfigMathDriver& conf_md,
       m_last_iterations_no{},
       m_last_tolerance{} {}
 
-void MathDriver::compute_displacements(Grid& grid,
-                                       const std::size_t imin,
-                                       const std::size_t i_nodes,
-                                       std::size_t jmin,
-                                       std::size_t jmax,
-                                       int ierr,
-                                       double* bmax) {
+double MathDriver::compute_displacements(Grid& grid,
+                                         const std::size_t imin,
+                                         const std::size_t imax_old,
+                                         std::size_t jmin,
+                                         std::size_t jmax) {
   const std::size_t grid_x = grid.size();
   const std::size_t grid_y = grid[0].size();
 
@@ -40,7 +38,7 @@ void MathDriver::compute_displacements(Grid& grid,
   }
 
   // NOTE: imax can be bigger than (grid_x-1) - index is renormalized
-  const std::size_t imax = imin + i_nodes;
+  const std::size_t imax = imin + imax_old;
 
   // delete old global indexes, insert blockade (-1: Dirichlet boundary
   // condition), numbers (0,1,2,3,...) dictate Neumann boundary condition
@@ -52,7 +50,7 @@ void MathDriver::compute_displacements(Grid& grid,
   }
 
   // max no of rows (two directions (x,y))
-  const std::size_t nrow_max = (i_nodes + 1) * (jmax - jmin + 1) * 2;
+  const std::size_t nrow_max = (imax_old + 1) * (jmax - jmin + 1) * 2;
 
   // index table, x_index, y_index, (move in x(3), move in y(4))
   std::vector<std::vector<std::size_t>> indx;
@@ -183,7 +181,7 @@ void MathDriver::compute_displacements(Grid& grid,
     // zerujemy element wektora wyrazow wolnych - usuwamy smieci z poprzednich
     // iteracji
     ff[k] = 0.;
-    std::fill(acol.begin(), acol.end(), 0.0);
+    std::fill(acol.begin(), acol.end(), 0.);
     std::fill(jcol.begin(), jcol.end(), 0);
 
     if (number == 3) {
@@ -218,42 +216,35 @@ void MathDriver::compute_displacements(Grid& grid,
       xx[k] = grid[i][j].v;
   }
 
-  // ierr=0,1:
-  // 0 - rozwiazujemy uklad rownan
-  // 1 - liczymy blad lokalny jak w publikacji
+  solve_linear_system(A, ff, xx);
 
-  if (ierr == 0) {
-    // rozwiazujemy uklad rownan
+  if (m_last_tolerance >= 1.0E-3 || m_last_iterations_no >= itmax0) {
+    printf("solution:  iterations,  tolerance  =   %6ld   %15.5E  \n\n",
+           m_last_iterations_no, m_last_tolerance);
+  }
 
-    solve_linear_system(A, ff, xx);
-
-    if (m_last_tolerance >= 1.0E-3 || m_last_iterations_no >= itmax0) {
-      printf("solution:  iterations,  tolerance  =   %6ld   %15.5E  \n\n",
-             m_last_iterations_no, m_last_tolerance);
-    }
-
-    // zachowujemy nowe polozenia/przesuniecia atomow
-    for (std::size_t k = 0; k < row_count; k++) {  // numer wiersza globalnego
-      std::size_t i = indx[k][0];
-      std::size_t j = indx[k][1];
-      std::size_t number = indx[k][2];  // 3-uij, 4-vij
-      if (number == 3)
-        grid[i][j].u = xx[k];  // number-2: 1-uij, 2-vij
-      else if (number == 4)
-        grid[i][j].v = xx[k];  // number-2: 1-uij, 2-vij
-    }
+  // zachowujemy nowe polozenia/przesuniecia atomow
+  for (std::size_t k = 0; k < row_count; k++) {  // numer wiersza globalnego
+    std::size_t i = indx[k][0];
+    std::size_t j = indx[k][1];
+    std::size_t number = indx[k][2];  // 3-uij, 4-vij
+    if (number == 3)
+      grid[i][j].u = xx[k];  // number-2: 1-uij, 2-vij
+    else if (number == 4)
+      grid[i][j].v = xx[k];  // number-2: 1-uij, 2-vij
   }
 
   // norma max z wektora reszt - liczymy zawsze: ierr-dowolne
-  matrix_times_vector(A, xx,
-                      bb);  // bb = csr_val*xx
-  *bmax = 0.;
+  // return value is important only for local relaxation
+  matrix_times_vector(A, xx, bb);
+  double biggest_abs_bi{};
   for (std::size_t i = 0; i < row_count; i++) {
-    bb[i] = bb[i] - ff[i];
-    if (std::fabs(bb[i]) > *bmax)
-      *bmax = std::fabs(bb[i]);
+    bb[i] -= ff[i];
+    if (std::abs(bb[i]) > biggest_abs_bi)
+      biggest_abs_bi = std::abs(bb[i]);
   }
-}  // solve Au=F:end
+  return biggest_abs_bi;
+}
 
 void MathDriver::matrix_times_vector(const CSRMatrix& A,
                                      const FastVector<double>& input,

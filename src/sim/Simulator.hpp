@@ -21,6 +21,7 @@ class Simulator {
   Simulator(const ConfigPhysics&,
             const ConfigSimulation&,
             const ConfigMathDriver&);
+  virtual ~Simulator() = default;
   void init_grid();
   void add_island();
   void print_header();
@@ -50,6 +51,7 @@ class Simulator {
   const std::size_t m_grid_x;
   const std::size_t m_grid_y;
   const std::size_t m_substrate_height;
+  const std::size_t m_initial_adatom_height;
 
   const std::size_t m_local_relaxation_range_min;
   const std::size_t m_local_relaxation_range_max;
@@ -75,7 +77,7 @@ class Simulator {
 
   Grid m_grid;
   Grid m_grid_copy;
-  DiffStructure m_atoms_diff;
+  DiffStructure m_atoms_diffused;
 
   // drivers
   std::unique_ptr<MathDriver> mathDriver;

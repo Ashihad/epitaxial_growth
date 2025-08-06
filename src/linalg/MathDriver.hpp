@@ -21,13 +21,11 @@ class MathDriver {
   MathDriver& operator=(const MathDriver&) = delete;
   MathDriver&& operator=(MathDriver&&) = delete;
 
-  void compute_displacements(Grid& grid,
-                             const std::size_t imin,
-                             const std::size_t i_nodes,
-                             std::size_t jmin,
-                             std::size_t jmax,
-                             int ierr,
-                             double* bmax);
+  double compute_displacements(Grid& grid,
+                               const std::size_t imin,
+                               const std::size_t i_nodes,
+                               std::size_t jmin,
+                               std::size_t jmax);
 
  protected:
   const double m_substrate_lattice_constant;
@@ -48,8 +46,8 @@ class MathDriver {
   double m_last_tolerance;
 
   // must be defined in child
-  virtual void solve_linear_system(CSRMatrix& A,
-                                   FastVector<double>& b,
+  virtual void solve_linear_system(const CSRMatrix& A,
+                                   const FastVector<double>& b,
                                    FastVector<double>& x) = 0;
 
   /**

@@ -12,18 +12,14 @@ class CGDriver : public MathDriver {
   CGDriver&& operator=(CGDriver&&) = delete;
 
   /**
-   *	solve linear equations system: CG - standard algorithm - Saad
+   * solve Ax = b, Conjugate gradient algorithm
+   * https://en.wikipedia.org/wiki/Conjugate_gradient_method#The_resulting_algorithm
    *
-   * @param n
-   * @param acsr
-   * @param icsr
-   * @param jcsr
-   * @param b
-   * @param x
-   * @param itmax
-   * @param tol
+   * @param A - matrix
+   * @param b - free vector
+   * @param x - solution vector
    */
-  void solve_linear_system(CSRMatrix& A,
-                           FastVector<double>& b,
+  void solve_linear_system(const CSRMatrix& A,
+                           const FastVector<double>& b,
                            FastVector<double>& x) override;
 };
