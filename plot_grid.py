@@ -185,7 +185,8 @@ def plot_dE_duv(args):
   ax.set_yticks([1] + list(range(10, y_max+2, 10)))
   im = ax.imshow(grid_masked, origin='lower', cmap=cmap, interpolation=None, extent=(1, x_max+1, 1, y_max+1))
   cax = fig.add_axes((ax.get_position().x1+0.01, ax.get_position().y0, 0.02, ax.get_position().height))
-  plt.colorbar(im, cax=cax, label=r'$\frac{dE}{duv}$')
+  cb = fig.colorbar(im, cax=cax)
+  cb.set_label(r'$\frac{dE}{duv}$', rotation=0, labelpad=15, fontsize=15)
   logger.info(f"Generation done")
 
   outfile_path = args.work_dir / outfile_name
@@ -257,9 +258,8 @@ if __name__ == "__main__":
   if not (os.path.exists(args.work_dir) and os.path.isdir(args.work_dir)):
     logger.critical(f"Invalid \"-w\" argument (argument is not a directory, got \"{args.work_dir}\")")
     sys.exit(1)
-
-  plot_grid(args)
-  plot_energies(args)
-  plot_energies_contour(args)
+  # plot_grid(args)
+  # plot_energies(args)
+  # plot_energies_contour(args)
   plot_dE_duv(args)
-  plot_displacements(args)
+  # plot_displacements(args)
