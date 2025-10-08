@@ -473,10 +473,10 @@ double Simulator::get_elastic_energy(const std::size_t x_pos,
   // looks like we only care about 3x3 neighborhood
   static Matrix3x3I atom_mask;
   // helper matrices, define as in Smereka 1+1
-  static Matrix3x3D d1;  // TODO
-  static Matrix3x3D d2;  // TODO
-  static Matrix3x3D u;
-  static Matrix3x3D v;
+  static Matrix3x3D d1;  // 0 if si-si, a_g-a_s otherwise
+  static Matrix3x3D d2;  // 0 if si-si, a_g-a_l otherwise
+  static Matrix3x3D u;   // local neighborhoods' U_x
+  static Matrix3x3D v;   // local neighborhoods' U_y
 
   // filling local helper matrices
   // iterate over neighborhood

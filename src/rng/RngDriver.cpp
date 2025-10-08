@@ -3,9 +3,10 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <iostream>
 #include <vector>
 
-#define DEBUG
+#define DEBUG 1
 
 /***************************************************************************
  *   generatory liczb pseudolosowych
@@ -45,6 +46,7 @@ namespace LegacyRNG {
 
 double gen_uniform() {
 #ifdef DEBUG
+  std::cout << "using fake rand\n";
   static unsigned fake_rand{};
   fake_rand = (1664525U * fake_rand + 1013904223U) % (RAND_MAX * 2U + 1U);
   return (static_cast<double>(fake_rand) /
