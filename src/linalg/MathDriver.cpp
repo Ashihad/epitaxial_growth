@@ -195,6 +195,27 @@ double MathDriver::compute_displacements(Grid& grid,
       compute_u_v_from_wxy(number, k, i_central, j_central, grid_x, ip,
                            iboundary, d1_matrix, grid, acol, jcol, ff);
     }
+    // workaround for GS method, no 0s on diagonal
+    if (number == 3) {
+      std::size_t ile = 0;
+      for (std::size_t ii = 0; ii < 3; ii++) {
+        for (std::size_t jj = 0; jj < 3; jj++) {
+          if (ip[ii][jj] > 0)
+            ile++;
+        }
+      }
+      if (ile == 2) {
+        ff[k] = 0.;  // zerowanie elementu w wektorze wyrazow wolnych
+        for (int l = 1; l <= jcol[0]; l++) {
+          std::size_t l_sz{static_cast<std::size_t>(l)};
+          if (jcol[l_sz] == static_cast<int>(k))
+            acol[l_sz] = 1.0;  // diagonala
+          else
+            acol[l_sz] = 0.;  // pozadiagonalne
+        }
+      }
+    }
+
     sort_and_add_matrix_elements(k, jcol, acol, A);
   }  // k=row index
 

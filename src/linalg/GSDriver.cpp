@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <cstring>
+#include <iomanip>
 #include <iostream>
 
 GSDriver::GSDriver(const ConfigMathDriver& conf_md,
@@ -41,7 +42,11 @@ void GSDriver::solve_linear_system(const CSRMatrix& A,
           sum += val * x[col];
       }
       if (std::abs(diag) < 1e-12) {
-        std::cerr << "Zero in diag at row " << i << ", cannot divide by zero\n";
+        // zero found on diagonal usually indicates error (division by 0),
+        // but in this case we can safely insert 1 here -
+        //
+        std::cerr << "Zero in diag at row " << i << ", n = " << n
+                  << ", cannot divide by zero\n";
         std::abort();
       }
       x[i] = (b[i] - sum) / diag;

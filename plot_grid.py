@@ -41,14 +41,16 @@ def plot_grid(args):
   fig.set_size_inches(15, 6)
   cmap = mpl.colors.ListedColormap(('white', 'navy', 'goldenrod'))
   norm = mpl.colors.BoundaryNorm((0, 1, 2, 3), cmap.N)
-  ax.set_xticks([1] + list(range(25, x_max+2, 25)))
+  ax.set_xticks([1] + list(range(50, x_max+2, 50)))
   ax.set_yticks([1] + list(range(10, y_max+2, 10)))
+  ax.tick_params(axis='both', which='major', labelsize=15)
   ax.imshow(grid, origin='lower', cmap=cmap, norm=norm, interpolation=None, extent=(1, x_max+1, 1, y_max+1))
+  ax.set_aspect(3)
   logger.info(f"Generation done")
 
   outfile_path = args.work_dir / outfile_name
   logger.info(f"Saving grid plot at {outfile_path}...")
-  plt.savefig(outfile_path)
+  plt.savefig(outfile_path, bbox_inches='tight', dpi=400)
   logger.info(f"Plot saved")
   
   if not args.quiet:
@@ -85,16 +87,21 @@ def plot_energies(args):
 
   fig, ax = plt.subplots()
   fig.set_size_inches(15, 6)
-  ax.set_xticks([1] + list(range(25, x_max+2, 25)))
+  ax.set_xticks([1] + list(range(50, x_max+2, 50)))
   ax.set_yticks([1] + list(range(10, y_max+2, 10)))
+  ax.tick_params(axis='both', which='major', labelsize=15)
   im = ax.imshow(grid_masked, origin='lower', cmap=cmap, interpolation=None, extent=(1, x_max+1, 1, y_max+1))
+  ax.set_aspect(3)
   cax = fig.add_axes((ax.get_position().x1+0.01, ax.get_position().y0, 0.02, ax.get_position().height))
-  plt.colorbar(im, cax=cax, ticks=np.linspace(df['ep'].min(), df['ep'].max(), 5), label='Energy [$eV$]')
+  cb = fig.colorbar(im, cax=cax)
+  cb.set_label('E [eV]', rotation=90, labelpad=15, fontsize=15)
+  cb.ax.tick_params(labelsize=12)
+  cb.set_ticks(np.linspace(df['ep'].min(), df['ep'].max(), 5))
   logger.info(f"Generation done")
 
   outfile_path = args.work_dir / outfile_name
   logger.info(f"Saving energy plot at {outfile_path}...")
-  plt.savefig(outfile_path)
+  plt.savefig(outfile_path, bbox_inches='tight', dpi=400)
   logger.info("Plot saved")
 
   if not args.quiet:
@@ -115,9 +122,10 @@ def plot_energies_contour(args):
   # filter out lowest row
   df = df[df['y'] > 0]
 
-  x_unique = np.sort(df['x'].unique())
-  y_unique = np.sort(df['y'].unique())
+  x_unique = np.sort(df['x'].unique())+1
+  y_unique = np.append(np.sort(df['y'].unique()), np.array([df['y'].max() + 1, df['y'].max() + 2]))
   X, Y = np.meshgrid(x_unique, y_unique)
+
   Z = df.pivot(index='y', columns='x', values='ep').values
   x_max = df['x'].max()
   y_max = df['y'].max()
@@ -130,19 +138,23 @@ def plot_energies_contour(args):
 
   fig, ax = plt.subplots()
   fig.set_size_inches(15, 6)
-  ax.set_xticks([1] + list(range(25, x_max+2, 25)))
+  ax.set_xticks([1] + list(range(50, x_max+2, 50)))
   ax.set_yticks([1] + list(range(10, y_max+2, 10)))
+  ax.tick_params(axis='both', which='major', labelsize=15)
   levels = 10
 
-  im = ax.contourf(Z, levels=levels, origin='lower', cmap="gnuplot")#, extent=(0, x_max+0, 0, y_max+0))
+  im = ax.contourf(X, Y, Z, levels=levels, origin='lower', cmap="gnuplot")#, extent=(0, x_max+0, 0, y_max+0))
   # ax.contour(Z, levels=levels, colors='black', linewidths=0.5, extent=(0, x_max+0, 0, y_max+0))
+  ax.set_aspect(3)
   cax = fig.add_axes((ax.get_position().x1+0.01, ax.get_position().y0, 0.02, ax.get_position().height))
-  plt.colorbar(im, cax=cax, label='Energy [$eV$]')
+  cb = fig.colorbar(im, cax=cax)
+  cb.set_label('E [eV]', rotation=90, labelpad=15, fontsize=15)
+  cb.ax.tick_params(labelsize=12)
   logger.info(f"Generation done")
 
   outfile_path = args.work_dir / outfile_name
   logger.info(f"Saving energy plot at {outfile_path}...")
-  plt.savefig(outfile_path)
+  plt.savefig(outfile_path, bbox_inches='tight', dpi=400)
   logger.info("Plot saved")
 
   if not args.quiet:
@@ -181,17 +193,21 @@ def plot_dE_duv(args):
 
   fig, ax = plt.subplots()
   fig.set_size_inches(15, 6)
-  ax.set_xticks([1] + list(range(25, x_max+2, 25)))
+  ax.set_xticks([1] + list(range(50, x_max+2, 50)))
   ax.set_yticks([1] + list(range(10, y_max+2, 10)))
-  im = ax.imshow(grid_masked, origin='lower', cmap=cmap, interpolation=None, extent=(1, x_max+1, 1, y_max+1))
+  ax.tick_params(axis='both', which='major', labelsize=15)
+  im = ax.imshow(grid_masked, origin='lower', cmap=cmap, interpolation=None, extent=(1, x_max+2, 1, y_max+1))
+  ax.set_aspect(3)
   cax = fig.add_axes((ax.get_position().x1+0.01, ax.get_position().y0, 0.02, ax.get_position().height))
   cb = fig.colorbar(im, cax=cax)
-  cb.set_label(r'$\frac{dE}{duv}$', rotation=0, labelpad=15, fontsize=15)
+  cb.ax.tick_params(labelsize=12)
+  cb.set_ticks(np.round(np.linspace(np.min(grid_masked[~np.isnan(grid_masked)]), np.max(grid_masked[~np.isnan(grid_masked)]), 5), 5))
+  cb.set_label(r'$\frac{d^2E}{d\vec{U}}$', rotation=90, labelpad=15, fontsize=20)
   logger.info(f"Generation done")
 
   outfile_path = args.work_dir / outfile_name
   logger.info(f"Saving energy plot at {outfile_path}...")
-  plt.savefig(outfile_path)
+  plt.savefig(outfile_path, bbox_inches='tight', dpi=400)
   logger.info("Plot saved")
 
   if not args.quiet:
@@ -231,16 +247,67 @@ def plot_displacements(args):
 
   fig, ax = plt.subplots()
   fig.set_size_inches(15, 6)
-  ax.set_xticks([1] + list(range(25, x_max+2, 25)))
+  ax.set_xticks([1] + list(range(50, x_max+2, 50)))
   ax.set_yticks([1] + list(range(10, y_max+2, 10)))
+  ax.tick_params(axis='both', which='major', labelsize=15)
   im = ax.imshow(grid_masked, origin='lower', cmap=cmap, interpolation=None, extent=(1, x_max+1, 1, y_max+1))
+  ax.set_aspect(3)
   cax = fig.add_axes((ax.get_position().x1+0.01, ax.get_position().y0, 0.02, ax.get_position().height))
-  plt.colorbar(im, cax=cax, label=r'$\vec{U}$')
+  cb = fig.colorbar(im, cax=cax)
+  cb.ax.tick_params(labelsize=12)
+  cb.set_ticks(np.round(np.linspace(np.min(grid_masked[~np.isnan(grid_masked)]), np.max(grid_masked[~np.isnan(grid_masked)]), 5), 5))
+  cb.set_label(r'$|\vec{U}|\,\,[\AA{}]$', rotation=90, labelpad=15, fontsize=20)
+
   logger.info(f"Generation done")
 
   outfile_path = args.work_dir / outfile_name
   logger.info(f"Saving energy plot at {outfile_path}...")
-  plt.savefig(outfile_path)
+  plt.savefig(outfile_path, bbox_inches='tight', dpi=400)
+  logger.info("Plot saved")
+
+  if not args.quiet:
+    plt.show()
+  plt.close()
+
+def plot_perf(args):
+  mpl.rcParams.update({'font.size': 22})
+  infile_name = "out.txt"
+  outfile_name = "perf.png"
+  
+  gs_path = f'materials/perf/gs/{infile_name}'
+  logger.info(f"Reading from {gs_path}...")
+  gs_df = pd.read_csv(gs_path, header=26, names=('iter', 'sim_time', 'atoms', 'idk', 'real_time', 'duv'), sep=r'\s+')
+
+  cg_path = f'materials/perf/cg/{infile_name}'
+  logger.info(f"Reading from {cg_path}...")
+  cg_df = pd.read_csv(cg_path, header=26, names=('iter', 'sim_time', 'atoms', 'idk', 'real_time', 'duv'), sep=r'\s+')
+
+  logger.info("Reading done")
+
+  fig, ax = plt.subplots()
+  fig.set_size_inches(15, 6)
+  # ax.set_xticks([1] + list(range(50, x_max+2, 50)))
+  # ax.set_yticks([1] + list(range(10, y_max+2, 10)))
+  # ax.tick_params(axis='both', which='major', labelsize=15)
+  ax.plot(gs_df['sim_time'], gs_df['real_time'], label='Gauss-Seidel')
+  ax.plot(cg_df['sim_time'], cg_df['real_time'], label='Conjugate Gradient')
+  ax.set_xlabel('Simulated time [s]')
+  ax.set_ylabel('Real time [s]')
+  ax.legend()
+  # im = ax.imshow(grid_masked, origin='lower', cmap=cmap, interpolation=None, extent=(1, x_max+1, 1, y_max+1))
+  # ax.set_aspect(3)
+  # cax = fig.add_axes((ax.get_position().x1+0.01, ax.get_position().y0, 0.02, ax.get_position().height))
+  # cb = fig.colorbar(im, cax=cax)
+  # cb.ax.tick_params(labelsize=12)
+  # cb.set_ticks(np.round(np.linspace(np.min(grid_masked[~np.isnan(grid_masked)]), np.max(grid_masked[~np.isnan(grid_masked)]), 5), 5))
+  # cb.set_label(r'$|\vec{U}|\,\,[\AA{}]$', rotation=90, labelpad=15, fontsize=20)
+
+  logger.info(f"Generation done")
+
+  # outfile_path = args.work_dir / outfile_name
+  outfile_path = outfile_name
+  # logger.info(f"Saving energy plot at {outfile_path}...")
+  plt.savefig(outfile_path, bbox_inches='tight', dpi=400)
   logger.info("Plot saved")
 
   if not args.quiet:
@@ -261,5 +328,6 @@ if __name__ == "__main__":
   # plot_grid(args)
   # plot_energies(args)
   # plot_energies_contour(args)
-  plot_dE_duv(args)
+  # plot_dE_duv(args)
   # plot_displacements(args)
+  plot_perf(args)

@@ -4,7 +4,7 @@
 
 struct ConfigSimulation {
   virtual ~ConfigSimulation() = default;
-  const std::size_t grid_x{125};
+  const std::size_t grid_x{250};
   const std::size_t grid_y{80};
   const std::size_t substrate_height{16};
   const std::size_t initial_adatom_height{0};
@@ -29,5 +29,5 @@ struct ConfigSimulation {
   const long unsigned dump_data_freq{1000};
 
   // whether to add island which should modify growth region shape
-  const bool add_island{true};
+  const bool add_island{false};
 };
