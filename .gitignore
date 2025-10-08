@@ -3,15 +3,8 @@ build/
 release/
 debug/
 
-# byproducts in materials/
-materials/*.dat
-materials/*.out
-
 # output
 *.dat
-
-# plotter outputs
-*.png
 
 # Python
 .venv/
